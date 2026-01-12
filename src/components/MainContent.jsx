@@ -45,10 +45,10 @@ function MainContent({
   }
 
   const examplePrompts = [
-    "Un logo minimaliste pour une startup tech",
-    "Une bannière de réseaux sociaux professionnelle",
-    "Une illustration pour une landing page",
-    "Un design de carte de visite moderne"
+    "Crée une publicité Instagram pour promouvoir notre nouvelle collection",
+    "Génère une bannière Facebook pour notre vente flash -30%",
+    "Crée un visuel story Instagram pour annoncer un nouveau produit",
+    "Génère une affiche publicitaire pour notre campagne de lancement"
   ]
 
   return (
@@ -61,7 +61,7 @@ function MainContent({
           </div>
           <h1 className="hero-title">Bienvenue sur Kilou's demo</h1>
           <p className="hero-subtitle">
-            Générez des images uniques en suivant votre guide de marque avec Nano Banana Pro
+            Créez des contenus marketing conformes à votre identité de marque avec Nano Banana Pro
           </p>
 
           <div className="features-grid">
@@ -70,21 +70,21 @@ function MainContent({
                 <Palette size={24} />
               </div>
               <h3>Guide de marque</h3>
-              <p>Uploadez jusqu'à 14 images de référence pour garder une cohérence visuelle</p>
+              <p>Uploadez votre charte graphique (PDF, logos, couleurs) pour des visuels 100% conformes</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon">
                 <Wand2 size={24} />
               </div>
-              <h3>IA Avancée</h3>
-              <p>Nano Banana Pro génère des images haute qualité jusqu'à 2K de résolution</p>
+              <h3>IA Marketing</h3>
+              <p>Nano Banana Pro crée des pubs, bannières et visuels avec votre logo et couleurs</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon">
                 <ImageIcon size={24} />
               </div>
-              <h3>Export Facile</h3>
-              <p>Téléchargez vos créations en un clic au format PNG</p>
+              <h3>Prêt à publier</h3>
+              <p>Téléchargez vos créations en haute qualité, prêtes pour vos campagnes</p>
             </div>
           </div>
 

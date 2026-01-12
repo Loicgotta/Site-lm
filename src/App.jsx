@@ -52,15 +52,26 @@ function App() {
 
       const imageParts = await Promise.all(imagePartsPromises)
 
-      // Build the prompt with brand guide context
+      // Build the prompt with brand guide context for marketing content
       let fullPrompt = prompt
       if (brandGuideFiles.length > 0) {
-        fullPrompt = `En suivant strictement le guide de marque fourni dans les ${brandGuideFiles.length} image(s) de référence ci-jointes (couleurs, typographie, style visuel, logos), génère l'image suivante:\n\n${prompt}`
+        fullPrompt = `INSTRUCTIONS: Tu es un expert en création de contenus marketing. Analyse attentivement le guide de marque fourni dans les ${brandGuideFiles.length} fichier(s) de référence ci-joints.
+
+GUIDE DE MARQUE À RESPECTER STRICTEMENT:
+- Utilise EXACTEMENT les mêmes couleurs (palette de couleurs)
+- Reproduis le logo tel qu'il apparaît dans le guide
+- Respecte la typographie et le style visuel
+- Maintiens la cohérence avec l'identité de marque
+
+DEMANDE DU CLIENT:
+${prompt}
+
+IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni, comme si elle était créée par l'équipe design de la marque.`
       }
 
-      // Call Gemini API with Nano Banana Pro model
+      // Call Gemini API with Nano Banana Pro model (gemini-3-pro-image-preview)
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -74,7 +85,8 @@ function App() {
               ]
             }],
             generationConfig: {
-              responseModalities: ["TEXT", "IMAGE"]
+              responseModalities: ["TEXT", "IMAGE"],
+              temperature: 0.7
             }
           })
         }
