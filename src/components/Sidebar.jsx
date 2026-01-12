@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { Upload, Image, X, FileImage, Plus, Palette } from 'lucide-react'
+import { Upload, Image, X, FileImage, Plus, Palette, FileText } from 'lucide-react'
 import './Sidebar.css'
 
 function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
@@ -8,13 +8,13 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files)
     const validFiles = files.filter(file => {
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp']
-      const maxSize = 5 * 1024 * 1024 // 5MB
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+      const maxSize = 10 * 1024 * 1024 // 10MB for PDFs
       return validTypes.includes(file.type) && file.size <= maxSize
     })
 
     if (validFiles.length < files.length) {
-      alert('Certains fichiers ont été ignorés. Formats acceptés: JPEG, PNG, WebP (max 5MB)')
+      alert('Certains fichiers ont été ignorés. Formats acceptés: JPEG, PNG, WebP, PDF (max 10MB)')
     }
 
     // Limit to 14 files (Nano Banana Pro limit)
@@ -32,8 +32,8 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
     e.currentTarget.classList.remove('drag-over')
     const files = Array.from(e.dataTransfer.files)
     const validFiles = files.filter(file => {
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp']
-      const maxSize = 5 * 1024 * 1024
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+      const maxSize = 10 * 1024 * 1024
       return validTypes.includes(file.type) && file.size <= maxSize
     })
     const newFiles = [...brandGuideFiles, ...validFiles].slice(0, 14)
@@ -59,7 +59,7 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
           <h3>Guide de marque</h3>
         </div>
         <p className="sidebar-description">
-          Uploadez jusqu'à 14 images de référence (logos, couleurs, typographie, style visuel)
+          Uploadez jusqu'à 14 fichiers de référence (logos, couleurs, typographie, PDF de charte graphique)
           pour que l'IA génère des images cohérentes avec votre identité visuelle.
         </p>
 
@@ -75,7 +75,7 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
             ref={fileInputRef}
             onChange={handleFileSelect}
             multiple
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
             style={{ display: 'none' }}
           />
           <div className="upload-icon">
@@ -88,7 +88,7 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
             ou cliquez pour parcourir
           </p>
           <p className="upload-formats">
-            JPEG, PNG, WebP • Max 5MB
+            JPEG, PNG, WebP, PDF • Max 10MB
           </p>
         </div>
 
@@ -102,11 +102,17 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
             {brandGuideFiles.map((file, index) => (
               <div key={index} className="uploaded-file">
                 <div className="file-preview">
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt={file.name}
-                    onLoad={(e) => URL.revokeObjectURL(e.target.src)}
-                  />
+                  {file.type === 'application/pdf' ? (
+                    <div className="pdf-icon">
+                      <FileText size={24} />
+                    </div>
+                  ) : (
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={file.name}
+                      onLoad={(e) => URL.revokeObjectURL(e.target.src)}
+                    />
+                  )}
                 </div>
                 <div className="file-info">
                   <span className="file-name" title={file.name}>
