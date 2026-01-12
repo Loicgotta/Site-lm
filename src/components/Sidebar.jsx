@@ -9,12 +9,12 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
     const files = Array.from(e.target.files)
     const validFiles = files.filter(file => {
       const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-      const maxSize = 10 * 1024 * 1024 // 10MB for PDFs
+      const maxSize = 50 * 1024 * 1024 // 50MB for large PDFs
       return validTypes.includes(file.type) && file.size <= maxSize
     })
 
     if (validFiles.length < files.length) {
-      alert('Certains fichiers ont été ignorés. Formats acceptés: JPEG, PNG, WebP, PDF (max 10MB)')
+      alert('Certains fichiers ont été ignorés. Formats acceptés: JPEG, PNG, WebP, PDF (max 50MB)')
     }
 
     // Limit to 14 files (Nano Banana Pro limit)
@@ -33,7 +33,7 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
     const files = Array.from(e.dataTransfer.files)
     const validFiles = files.filter(file => {
       const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-      const maxSize = 10 * 1024 * 1024
+      const maxSize = 50 * 1024 * 1024 // 50MB
       return validTypes.includes(file.type) && file.size <= maxSize
     })
     const newFiles = [...brandGuideFiles, ...validFiles].slice(0, 14)
@@ -88,7 +88,7 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
             ou cliquez pour parcourir
           </p>
           <p className="upload-formats">
-            JPEG, PNG, WebP, PDF • Max 10MB
+            JPEG, PNG, WebP, PDF • Max 50MB
           </p>
         </div>
 
