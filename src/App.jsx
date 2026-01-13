@@ -266,16 +266,22 @@ INSTRUCTIONS DE PRODUCTION:
       }
 
       // Étape 3: Appeler l'API Veo 3.1 pour générer la vidéo
+      // Note: Veo 3.1 est en paid preview - utilise predictLongRunning
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:generateVideos?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
           body: JSON.stringify({
-            prompt: fullVideoPrompt,
-            config: {
+            instances: [{
+              prompt: fullVideoPrompt
+            }],
+            parameters: {
               aspectRatio: "16:9",
-              numberOfVideos: 1,
+              sampleCount: 1,
               durationSeconds: 8,
               personGeneration: "allow_adult"
             }
@@ -284,7 +290,14 @@ INSTRUCTIONS DE PRODUCTION:
       )
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({}))
+        // Vérifier si c'est une erreur d'accès au modèle
+        if (response.status === 404) {
+          throw new Error('Veo 3.1 est en paid preview. Vérifiez que votre clé API a accès à ce modèle dans Google AI Studio.')
+        }
+        if (response.status === 403) {
+          throw new Error('Accès refusé à Veo 3.1. Ce modèle nécessite un abonnement paid preview.')
+        }
         throw new Error(errorData.error?.message || 'Erreur lors de la génération vidéo')
       }
 
@@ -303,15 +316,23 @@ INSTRUCTIONS DE PRODUCTION:
           await new Promise(resolve => setTimeout(resolve, 5000)) // Attendre 5 secondes
 
           const statusResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`
+            `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+            {
+              headers: {
+                'x-goog-api-key': apiKey
+              }
+            }
           )
 
           if (statusResponse.ok) {
             const statusData = await statusResponse.json()
 
             if (statusData.done) {
-              if (statusData.response?.generatedVideos) {
-                videoResult = statusData.response.generatedVideos
+              // Format de réponse Veo 3.1
+              if (statusData.response?.generatedSamples) {
+                videoResult = statusData.response.generatedSamples
+              } else if (statusData.response?.videos) {
+                videoResult = statusData.response.videos
               } else if (statusData.error) {
                 throw new Error(statusData.error.message || 'Erreur lors de la génération vidéo')
               }
@@ -328,7 +349,7 @@ INSTRUCTIONS DE PRODUCTION:
         // Ajouter les vidéos générées
         const newVideos = videoResult.map(video => ({
           id: Date.now() + Math.random(),
-          data: video.video?.uri || `data:video/mp4;base64,${video.video?.videoBytes}`,
+          data: video.video?.uri || video.uri || video.gcsUri || `data:video/mp4;base64,${video.bytesBase64Encoded || video.video?.videoBytes}`,
           prompt: prompt,
           timestamp: new Date().toISOString(),
           type: 'video',
