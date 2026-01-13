@@ -57,47 +57,18 @@ function App() {
     // Convert all files to base64
     const fileParts = await Promise.all(brandGuideFiles.map(fileToBase64))
 
-    const analysisPrompt = `Tu es un expert en analyse de guides de marque et en direction artistique. Analyse MÉTICULEUSEMENT les ${brandGuideFiles.length} fichier(s) de guide de marque fournis.
+    const analysisPrompt = `Analyse ce guide de marque et génère une DESCRIPTION VISUELLE CONCISE pour la création de vidéos.
 
-EXTRAIS ET DÉCRIS EN DÉTAIL:
+Réponds UNIQUEMENT avec un paragraphe de style visuel (max 200 mots) qui décrit:
+- Les couleurs dominantes (ex: "bleu navy #1a365d, blanc, touches dorées")
+- Le style visuel (ex: "moderne et épuré", "luxueux et sophistiqué", "dynamique et coloré")
+- L'ambiance (ex: "professionnelle", "chaleureuse", "énergique")
+- Les éléments distinctifs du logo si visible
 
-1. **PALETTE DE COULEURS**:
-   - Couleur primaire (code hex si visible, sinon description précise)
-   - Couleurs secondaires
-   - Couleurs d'accent
-   - Couleurs à éviter
+Format de réponse attendu (exemple):
+"Style visuel: moderne et minimaliste. Couleurs: bleu profond comme couleur principale, blanc pour les espaces, accents dorés. Ambiance: professionnelle et premium. Éclairage: naturel et lumineux. Le logo est géométrique avec des lignes épurées."
 
-2. **LOGO ET IDENTITÉ VISUELLE**:
-   - Description détaillée du logo
-   - Formes et symboles utilisés
-   - Espace de protection autour du logo
-   - Variations du logo (horizontal, vertical, monochrome)
-
-3. **TYPOGRAPHIE**:
-   - Police principale (titres)
-   - Police secondaire (corps de texte)
-   - Style typographique général (moderne, classique, bold, léger)
-
-4. **STYLE VISUEL ET DIRECTION ARTISTIQUE**:
-   - Ambiance générale (luxueuse, décontractée, professionnelle, fun)
-   - Style photographique préféré
-   - Textures et motifs récurrents
-   - Éclairage préféré (naturel, studio, dramatique)
-
-5. **TON ET PERSONNALITÉ DE MARQUE**:
-   - Valeurs de la marque
-   - Ton de communication (formel, amical, inspirant)
-   - Émotions à transmettre
-
-6. **ÉLÉMENTS GRAPHIQUES**:
-   - Icônes et pictogrammes
-   - Patterns ou motifs
-   - Cadres et bordures
-   - Effets visuels caractéristiques
-
-IMPORTANT: Sois TRÈS PRÉCIS et EXHAUSTIF. Ces informations seront utilisées pour générer des vidéos parfaitement conformes à l'identité de marque.
-
-Réponds en format structuré avec des bullet points clairs.`
+Sois CONCIS et DESCRIPTIF pour permettre la génération de vidéos cohérentes.`
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -240,33 +211,16 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
       setIsAnalyzing(false)
 
       // Étape 2: Construire le prompt enrichi pour Veo 3.1
+      // Veo fonctionne mieux avec des descriptions visuelles simples
       let fullVideoPrompt = prompt
 
       if (brandGuidelines) {
-        fullVideoPrompt = `[DIRECTIVES DE MARQUE - RESPECTER IMPÉRATIVEMENT]
-
-${brandGuidelines}
-
-[FIN DES DIRECTIVES DE MARQUE]
-
----
-
-DEMANDE VIDÉO DU CLIENT:
-${prompt}
-
----
-
-INSTRUCTIONS DE PRODUCTION:
-- La vidéo DOIT respecter STRICTEMENT toutes les directives de marque ci-dessus
-- Utiliser UNIQUEMENT les couleurs de la palette de marque
-- Intégrer le logo de manière naturelle si pertinent
-- Maintenir le ton et l'ambiance définis dans le guide
-- La qualité visuelle doit refléter le positionnement de la marque
-- Chaque frame doit être cohérente avec l'identité visuelle de la marque`
+        // Combiner le style de marque avec la demande utilisateur
+        fullVideoPrompt = `${prompt}. ${brandGuidelines}`
       }
 
       // Étape 3: Appeler l'API Veo 3.1 pour générer la vidéo
-      // Note: Veo 3.1 est en paid preview - utilise predictLongRunning
+      // Format minimal selon la documentation officielle
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning`,
         {
@@ -278,11 +232,7 @@ INSTRUCTIONS DE PRODUCTION:
           body: JSON.stringify({
             instances: [{
               prompt: fullVideoPrompt
-            }],
-            parameters: {
-              aspectRatio: "16:9",
-              sampleCount: 1
-            }
+            }]
           })
         }
       )
