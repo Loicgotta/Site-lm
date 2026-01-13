@@ -232,7 +232,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
       addLog('📤 Envoi requête à Veo 2...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-exp:predictLongRunning`,
+        `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning`,
         {
           method: 'POST',
           headers: {
