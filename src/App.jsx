@@ -204,6 +204,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
 
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+      const veoApiKey = import.meta.env.VITE_VEO_API_KEY || apiKey // Clé séparée pour Veo
 
       // Étape 1: Analyser le guide de marque avec l'agent IA
       let brandGuidelines = ''
@@ -237,7 +238,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
+            'x-goog-api-key': veoApiKey
           },
           body: JSON.stringify({
             instances: [{
@@ -281,7 +282,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
             `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
             {
               headers: {
-                'x-goog-api-key': apiKey
+                'x-goog-api-key': veoApiKey
               }
             }
           )
