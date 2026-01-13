@@ -296,15 +296,24 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
           })
 
           if (statusData.done) {
-            if (statusData.response?.generatedSamples) {
+            // Vérifier si la vidéo a été filtrée par RAI (Responsible AI)
+            const generateVideoResponse = statusData.response?.generateVideoResponse
+            if (generateVideoResponse?.raiMediaFilteredCount > 0) {
+              const reason = generateVideoResponse.raiMediaFilteredReasons?.[0] || 'Contenu filtré par les politiques de sécurité'
+              addLog('🚫 Vidéo filtrée par RAI', generateVideoResponse)
+              throw new Error(`Vidéo bloquée par Google: ${reason}`)
+            }
+
+            // Chercher les vidéos générées dans différents formats de réponse
+            if (generateVideoResponse?.generatedSamples) {
+              videoResult = generateVideoResponse.generatedSamples
+              addLog('✅ Vidéo générée (generateVideoResponse.generatedSamples)', videoResult)
+            } else if (statusData.response?.generatedSamples) {
               videoResult = statusData.response.generatedSamples
               addLog('✅ Vidéo générée (generatedSamples)', videoResult)
             } else if (statusData.response?.videos) {
               videoResult = statusData.response.videos
               addLog('✅ Vidéo générée (videos)', videoResult)
-            } else if (statusData.response?.generateVideoResponse?.generatedSamples) {
-              videoResult = statusData.response.generateVideoResponse.generatedSamples
-              addLog('✅ Vidéo générée (generateVideoResponse)', videoResult)
             } else if (statusData.error) {
               addLog('❌ Erreur dans la réponse', statusData.error)
               throw new Error(statusData.error.message || JSON.stringify(statusData.error))
