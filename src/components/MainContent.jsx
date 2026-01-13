@@ -13,7 +13,10 @@ import {
   Clock,
   Palette,
   Brain,
-  Play
+  Play,
+  Terminal,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import './MainContent.css'
 
@@ -31,10 +34,13 @@ function MainContent({
   onRemoveImage,
   onRemoveVideo,
   brandGuideCount,
-  generationMode
+  generationMode,
+  logs = [],
+  onClearLogs
 }) {
   const [selectedImage, setSelectedImage] = useState(null)
   const [selectedVideo, setSelectedVideo] = useState(null)
+  const [logsExpanded, setLogsExpanded] = useState(true)
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -298,6 +304,37 @@ function MainContent({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Logs Panel */}
+      {logs.length > 0 && (
+        <div className="logs-panel">
+          <div className="logs-header" onClick={() => setLogsExpanded(!logsExpanded)}>
+            <div className="logs-title">
+              <Terminal size={16} />
+              <span>Logs API ({logs.length})</span>
+            </div>
+            <div className="logs-actions">
+              <button onClick={(e) => { e.stopPropagation(); onClearLogs(); }} className="clear-logs-btn">
+                <Trash2 size={14} />
+              </button>
+              {logsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </div>
+          </div>
+          {logsExpanded && (
+            <div className="logs-content">
+              {logs.map((log, index) => (
+                <div key={index} className="log-entry">
+                  <span className="log-time">[{log.timestamp}]</span>
+                  <span className="log-message">{log.message}</span>
+                  {log.data && (
+                    <pre className="log-data">{log.data}</pre>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

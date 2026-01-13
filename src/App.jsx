@@ -15,6 +15,15 @@ function App() {
   const [generationMode, setGenerationMode] = useState('image') // 'image' or 'video'
   const [brandAnalysis, setBrandAnalysis] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [logs, setLogs] = useState([]) // Logs pour debug
+
+  // Fonction pour ajouter un log
+  const addLog = useCallback((message, data = null) => {
+    const timestamp = new Date().toLocaleTimeString('fr-FR')
+    const logEntry = { timestamp, message, data: data ? JSON.stringify(data, null, 2) : null }
+    setLogs(prev => [...prev, logEntry])
+    console.log(`[${timestamp}] ${message}`, data || '')
+  }, [])
 
   const handleFilesChange = useCallback((files) => {
     setBrandGuideFiles(files)
@@ -220,7 +229,8 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
       }
 
       // Étape 3: Appeler l'API Veo 3.1 pour générer la vidéo
-      // Format minimal selon la documentation officielle
+      addLog('📤 Envoi requête à Veo 3.1...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
+
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning`,
         {
@@ -237,31 +247,35 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
         }
       )
 
+      addLog(`📥 Réponse initiale: ${response.status} ${response.statusText}`)
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        // Vérifier si c'est une erreur d'accès au modèle
+        addLog('❌ Erreur API', errorData)
         if (response.status === 404) {
           throw new Error('Veo 3.1 est en paid preview. Vérifiez que votre clé API a accès à ce modèle dans Google AI Studio.')
         }
         if (response.status === 403) {
           throw new Error('Accès refusé à Veo 3.1. Ce modèle nécessite un abonnement paid preview.')
         }
-        throw new Error(errorData.error?.message || 'Erreur lors de la génération vidéo')
+        throw new Error(errorData.error?.message || `Erreur ${response.status}: ${JSON.stringify(errorData)}`)
       }
 
       const data = await response.json()
+      addLog('✅ Opération créée', data)
 
-      // Veo 3.1 retourne une opération asynchrone, on doit polling pour le résultat
       const operationName = data.name
 
       if (operationName) {
-        // Polling pour attendre la fin de la génération
+        addLog(`🔄 Polling opération: ${operationName}`)
+
         let videoResult = null
         let attempts = 0
-        const maxAttempts = 60 // 5 minutes max (5s * 60)
+        const maxAttempts = 60
 
         while (!videoResult && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 5000)) // Attendre 5 secondes
+          await new Promise(resolve => setTimeout(resolve, 5000))
+          attempts++
 
           const statusResponse = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
@@ -272,25 +286,37 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
             }
           )
 
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json()
+          const statusData = await statusResponse.json()
+          addLog(`🔍 Polling #${attempts}`, {
+            done: statusData.done,
+            hasResponse: !!statusData.response,
+            hasError: !!statusData.error,
+            metadata: statusData.metadata,
+            fullResponse: statusData
+          })
 
-            if (statusData.done) {
-              // Format de réponse Veo 3.1
-              if (statusData.response?.generatedSamples) {
-                videoResult = statusData.response.generatedSamples
-              } else if (statusData.response?.videos) {
-                videoResult = statusData.response.videos
-              } else if (statusData.error) {
-                throw new Error(statusData.error.message || 'Erreur lors de la génération vidéo')
-              }
+          if (statusData.done) {
+            if (statusData.response?.generatedSamples) {
+              videoResult = statusData.response.generatedSamples
+              addLog('✅ Vidéo générée (generatedSamples)', videoResult)
+            } else if (statusData.response?.videos) {
+              videoResult = statusData.response.videos
+              addLog('✅ Vidéo générée (videos)', videoResult)
+            } else if (statusData.response?.generateVideoResponse?.generatedSamples) {
+              videoResult = statusData.response.generateVideoResponse.generatedSamples
+              addLog('✅ Vidéo générée (generateVideoResponse)', videoResult)
+            } else if (statusData.error) {
+              addLog('❌ Erreur dans la réponse', statusData.error)
+              throw new Error(statusData.error.message || JSON.stringify(statusData.error))
+            } else {
+              addLog('⚠️ Réponse done=true mais pas de vidéo', statusData)
+              throw new Error(`Réponse inattendue: ${JSON.stringify(statusData)}`)
             }
           }
-
-          attempts++
         }
 
         if (!videoResult) {
+          addLog('⏰ Timeout après ' + attempts + ' tentatives')
           throw new Error('Timeout: La génération de la vidéo prend trop de temps.')
         }
 
@@ -369,6 +395,8 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
           onRemoveVideo={handleRemoveVideo}
           brandGuideCount={brandGuideFiles.length}
           generationMode={generationMode}
+          logs={logs}
+          onClearLogs={() => setLogs([])}
         />
       </div>
     </div>
