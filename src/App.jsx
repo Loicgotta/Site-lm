@@ -281,9 +281,7 @@ INSTRUCTIONS DE PRODUCTION:
             }],
             parameters: {
               aspectRatio: "16:9",
-              sampleCount: 1,
-              durationSeconds: 8,
-              personGeneration: "allow_adult"
+              sampleCount: 1
             }
           })
         }
