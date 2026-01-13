@@ -1,8 +1,8 @@
 import React, { useRef } from 'react'
-import { Upload, Image, X, FileImage, Plus, Palette, FileText } from 'lucide-react'
+import { Upload, Image, X, FileImage, Plus, Palette, FileText, Video, Sparkles } from 'lucide-react'
 import './Sidebar.css'
 
-function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
+function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onModeChange }) {
   const fileInputRef = useRef(null)
 
   const handleFileSelect = (e) => {
@@ -53,14 +53,47 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
 
   return (
     <aside className="sidebar">
+      {/* Mode Selector */}
+      <div className="sidebar-section">
+        <div className="sidebar-section-header">
+          <Sparkles size={18} />
+          <h3>Type de contenu</h3>
+        </div>
+        <div className="mode-selector">
+          <button
+            className={`mode-btn ${generationMode === 'image' ? 'active' : ''}`}
+            onClick={() => onModeChange('image')}
+          >
+            <Image size={20} />
+            <span>Image</span>
+          </button>
+          <button
+            className={`mode-btn ${generationMode === 'video' ? 'active' : ''}`}
+            onClick={() => onModeChange('video')}
+          >
+            <Video size={20} />
+            <span>Vidéo</span>
+          </button>
+        </div>
+        <p className="mode-description">
+          {generationMode === 'image'
+            ? 'Nano Banana Pro génère des images marketing haute qualité'
+            : 'Veo 3.1 crée des vidéos 8s en 1080p avec audio synchronisé'
+          }
+        </p>
+      </div>
+
+      {/* Brand Guide Upload */}
       <div className="sidebar-section">
         <div className="sidebar-section-header">
           <Palette size={18} />
           <h3>Guide de marque</h3>
         </div>
         <p className="sidebar-description">
-          Uploadez jusqu'à 14 fichiers de référence (logos, couleurs, typographie, PDF de charte graphique)
-          pour que l'IA génère des images cohérentes avec votre identité visuelle.
+          {generationMode === 'image'
+            ? 'Uploadez votre charte graphique pour des visuels conformes à votre identité.'
+            : 'Un agent IA analysera votre guide pour créer des vidéos parfaitement alignées avec votre marque.'
+          }
         </p>
 
         <div
@@ -150,21 +183,27 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange }) {
         )}
       </div>
 
+      {/* Settings */}
       <div className="sidebar-section">
         <div className="sidebar-section-header">
           <Image size={18} />
           <h3>Paramètres</h3>
         </div>
         <div className="settings-info">
-          <p>
-            <strong>Modèle:</strong> Nano Banana Pro
-          </p>
-          <p>
-            <strong>Résolution:</strong> Jusqu'à 2K
-          </p>
-          <p>
-            <strong>Format:</strong> PNG
-          </p>
+          {generationMode === 'image' ? (
+            <>
+              <p><strong>Modèle:</strong> Nano Banana Pro</p>
+              <p><strong>Résolution:</strong> Jusqu'à 2K</p>
+              <p><strong>Format:</strong> PNG</p>
+            </>
+          ) : (
+            <>
+              <p><strong>Modèle:</strong> Veo 3.1</p>
+              <p><strong>Résolution:</strong> 1080p HD</p>
+              <p><strong>Durée:</strong> 8 secondes</p>
+              <p><strong>Audio:</strong> Synchronisé natif</p>
+            </>
+          )}
         </div>
       </div>
 
