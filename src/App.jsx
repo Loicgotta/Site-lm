@@ -315,21 +315,17 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
       addLog('📤 Envoi requête à Veo 2...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateVideos?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
           },
           body: JSON.stringify({
-            prompt: fullVideoPrompt,
-            config: {
-              aspectRatio: "16:9",
-              numberOfVideos: 1,
-              durationSeconds: 8,
-              personGeneration: "ALLOW_ALL",
-              resolution: "720p"
-            }
+            instances: [{
+              prompt: fullVideoPrompt
+            }]
           })
         }
       )
