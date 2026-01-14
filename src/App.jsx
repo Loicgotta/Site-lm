@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import Header from './components/Header'
 import Sidebar from './components/Sidebar'
 import MainContent from './components/MainContent'
@@ -16,6 +16,8 @@ function App() {
   const [brandAnalysis, setBrandAnalysis] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [logs, setLogs] = useState([]) // Logs pour debug
+  const [oauthToken, setOauthToken] = useState(null) // Token OAuth pour Veo
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
 
   // Fonction pour ajouter un log
   const addLog = useCallback((message, data = null) => {
@@ -23,6 +25,87 @@ function App() {
     const logEntry = { timestamp, message, data: data ? JSON.stringify(data, null, 2) : null }
     setLogs(prev => [...prev, logEntry])
     console.log(`[${timestamp}] ${message}`, data || '')
+  }, [])
+
+  // OAuth Configuration
+  const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  const CLIENT_SECRET = import.meta.env.VITE_GOOGLE_CLIENT_SECRET
+  const REDIRECT_URI = window.location.origin + '/oauth-callback'
+  const SCOPES = 'https://www.googleapis.com/auth/generative-language https://www.googleapis.com/auth/cloud-platform'
+
+  // Fonction pour démarrer l'authentification OAuth
+  const startOAuth = useCallback(() => {
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+      `&response_type=code` +
+      `&scope=${encodeURIComponent(SCOPES)}` +
+      `&access_type=offline` +
+      `&prompt=consent`
+
+    addLog('🔐 Démarrage OAuth...', { authUrl })
+
+    // Ouvrir popup OAuth
+    const width = 500
+    const height = 600
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+
+    const popup = window.open(
+      authUrl,
+      'oauth',
+      `width=${width},height=${height},left=${left},top=${top}`
+    )
+
+    // Écouter le callback
+    window.oauthCallback = async (code) => {
+      addLog('📥 Code OAuth reçu', { code: code.substring(0, 20) + '...' })
+      setIsAuthenticating(true)
+
+      try {
+        // Échanger le code contre un token
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            redirect_uri: REDIRECT_URI,
+            grant_type: 'authorization_code'
+          })
+        })
+
+        const tokenData = await tokenResponse.json()
+        addLog('🔑 Token reçu', {
+          hasAccessToken: !!tokenData.access_token,
+          expiresIn: tokenData.expires_in,
+          error: tokenData.error
+        })
+
+        if (tokenData.access_token) {
+          setOauthToken(tokenData.access_token)
+          localStorage.setItem('veo_oauth_token', tokenData.access_token)
+          addLog('✅ Authentification réussie!')
+        } else {
+          throw new Error(tokenData.error_description || tokenData.error || 'Erreur token')
+        }
+      } catch (err) {
+        addLog('❌ Erreur OAuth', { error: err.message })
+        setError('Erreur d\'authentification: ' + err.message)
+      } finally {
+        setIsAuthenticating(false)
+      }
+    }
+  }, [CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, SCOPES, addLog])
+
+  // Charger le token depuis localStorage au démarrage
+  useEffect(() => {
+    const savedToken = localStorage.getItem('veo_oauth_token')
+    if (savedToken) {
+      setOauthToken(savedToken)
+      addLog('🔑 Token OAuth chargé depuis localStorage')
+    }
   }, [])
 
   const handleFilesChange = useCallback((files) => {
@@ -191,10 +274,17 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
     }
   }, [prompt, brandGuideFiles])
 
-  // Génération de vidéo avec Veo 3.1
+  // Génération de vidéo avec Veo 2 (OAuth)
   const handleGenerateVideo = useCallback(async () => {
     if (!prompt.trim()) {
       setError('Veuillez entrer un prompt pour générer une vidéo.')
+      return
+    }
+
+    // Vérifier si on a un token OAuth
+    if (!oauthToken) {
+      addLog('⚠️ Token OAuth requis pour Veo 2')
+      setError('Authentification requise pour la génération vidéo. Cliquez sur "Se connecter à Google" dans la sidebar.')
       return
     }
 
@@ -204,7 +294,6 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
 
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-      const veoApiKey = import.meta.env.VITE_VEO_API_KEY || apiKey // Clé séparée pour Veo
 
       // Étape 1: Analyser le guide de marque avec l'agent IA
       let brandGuidelines = ''
@@ -229,8 +318,8 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
         fullVideoPrompt = `${prompt}. ${brandGuidelines}`
       }
 
-      // Étape 3: Appeler l'API Veo 2 pour générer la vidéo
-      addLog('📤 Envoi requête à Veo 2...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
+      // Étape 3: Appeler l'API Veo 2 pour générer la vidéo (avec OAuth)
+      addLog('📤 Envoi requête à Veo 2 (OAuth)...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning`,
@@ -238,7 +327,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-goog-api-key': veoApiKey
+            'Authorization': `Bearer ${oauthToken}`
           },
           body: JSON.stringify({
             instances: [{
@@ -282,7 +371,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
             `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
             {
               headers: {
-                'x-goog-api-key': veoApiKey
+                'Authorization': `Bearer ${oauthToken}`
               }
             }
           )
@@ -352,7 +441,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
       setIsGenerating(false)
       setIsAnalyzing(false)
     }
-  }, [prompt, brandGuideFiles, brandAnalysis, analyzeBrandGuide])
+  }, [prompt, brandGuideFiles, brandAnalysis, analyzeBrandGuide, oauthToken, addLog])
 
   // Handler principal de génération
   const handleGenerate = useCallback(() => {
@@ -362,6 +451,13 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
       handleGenerateVideo()
     }
   }, [generationMode, handleGenerateImage, handleGenerateVideo])
+
+  // Déconnexion OAuth
+  const handleLogout = useCallback(() => {
+    setOauthToken(null)
+    localStorage.removeItem('veo_oauth_token')
+    addLog('🔓 Déconnexion OAuth')
+  }, [addLog])
 
   const handleClearHistory = useCallback(() => {
     setGeneratedImages([])
@@ -389,6 +485,9 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
           onFilesChange={handleFilesChange}
           generationMode={generationMode}
           onModeChange={handleModeChange}
+          isAuthenticated={!!oauthToken}
+          onLogin={startOAuth}
+          onLogout={handleLogout}
         />
         <MainContent
           prompt={prompt}
