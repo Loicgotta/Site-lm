@@ -274,7 +274,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
     }
   }, [prompt, brandGuideFiles])
 
-  // Génération de vidéo avec Veo 3.1 (API Key)
+  // Génération de vidéo avec Veo 2 (API Key)
   const handleGenerateVideo = useCallback(async () => {
     if (!prompt.trim()) {
       setError('Veuillez entrer un prompt pour générer une vidéo.')
@@ -302,7 +302,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
 
       setIsAnalyzing(false)
 
-      // Étape 2: Construire le prompt enrichi pour Veo 3.1
+      // Étape 2: Construire le prompt enrichi pour Veo 2
       // Veo fonctionne mieux avec des descriptions visuelles simples
       let fullVideoPrompt = prompt
 
@@ -311,21 +311,25 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
         fullVideoPrompt = `${prompt}. ${brandGuidelines}`
       }
 
-      // Étape 3: Appeler l'API Veo 3.1 pour générer la vidéo
-      addLog('📤 Envoi requête à Veo 3.1...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
+      // Étape 3: Appeler l'API Veo 2 pour générer la vidéo
+      addLog('📤 Envoi requête à Veo 2...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning`,
+        `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateVideos?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            instances: [{
-              prompt: fullVideoPrompt
-            }]
+            prompt: fullVideoPrompt,
+            config: {
+              aspectRatio: "16:9",
+              numberOfVideos: 1,
+              durationSeconds: 8,
+              personGeneration: "ALLOW_ALL",
+              resolution: "720p"
+            }
           })
         }
       )
@@ -336,10 +340,10 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
         const errorData = await response.json().catch(() => ({}))
         addLog('❌ Erreur API', errorData)
         if (response.status === 404) {
-          throw new Error('Veo 3.1 n\'est pas disponible. Vérifiez que votre clé API a accès à ce modèle.')
+          throw new Error('Veo 2 n\'est pas disponible. Vérifiez que votre clé API a accès à ce modèle.')
         }
         if (response.status === 403) {
-          throw new Error('Accès refusé à Veo 3.1. Ce modèle nécessite un abonnement payant.')
+          throw new Error('Accès refusé à Veo 2. Ce modèle nécessite un abonnement payant.')
         }
         throw new Error(errorData.error?.message || `Erreur ${response.status}: ${JSON.stringify(errorData)}`)
       }
@@ -424,7 +428,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
 
         setGeneratedVideos(prev => [...newVideos, ...prev])
       } else {
-        throw new Error('Réponse inattendue de l\'API Veo 3.1')
+        throw new Error('Réponse inattendue de l\'API Veo 2')
       }
 
     } catch (err) {
