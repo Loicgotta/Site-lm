@@ -274,17 +274,10 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
     }
   }, [prompt, brandGuideFiles])
 
-  // Génération de vidéo avec Veo 2 (OAuth)
+  // Génération de vidéo avec Veo 2 (API Key)
   const handleGenerateVideo = useCallback(async () => {
     if (!prompt.trim()) {
       setError('Veuillez entrer un prompt pour générer une vidéo.')
-      return
-    }
-
-    // Vérifier si on a un token OAuth
-    if (!oauthToken) {
-      addLog('⚠️ Token OAuth requis pour Veo 2')
-      setError('Authentification requise. Cliquez sur "Se connecter avec Google" dans la sidebar.')
       return
     }
 
@@ -318,8 +311,8 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
         fullVideoPrompt = `${prompt}. ${brandGuidelines}`
       }
 
-      // Étape 3: Appeler l'API Veo 2 pour générer la vidéo (OAuth)
-      addLog('📤 Envoi requête à Veo 2 (OAuth)...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
+      // Étape 3: Appeler l'API Veo 2 pour générer la vidéo
+      addLog('📤 Envoi requête à Veo 2...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning`,
@@ -327,7 +320,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${oauthToken}`
+            'x-goog-api-key': apiKey
           },
           body: JSON.stringify({
             instances: [{
@@ -371,7 +364,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
             `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
             {
               headers: {
-                'Authorization': `Bearer ${oauthToken}`
+                'x-goog-api-key': apiKey
               }
             }
           )
@@ -441,7 +434,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
       setIsGenerating(false)
       setIsAnalyzing(false)
     }
-  }, [prompt, brandGuideFiles, brandAnalysis, analyzeBrandGuide, oauthToken, addLog])
+  }, [prompt, brandGuideFiles, brandAnalysis, analyzeBrandGuide, addLog])
 
   // Handler principal de génération
   const handleGenerate = useCallback(() => {
@@ -485,9 +478,6 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
           onFilesChange={handleFilesChange}
           generationMode={generationMode}
           onModeChange={handleModeChange}
-          isAuthenticated={!!oauthToken}
-          onLogin={startOAuth}
-          onLogout={handleLogout}
         />
         <MainContent
           prompt={prompt}
