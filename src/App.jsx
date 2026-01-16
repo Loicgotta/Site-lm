@@ -352,13 +352,13 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
     setError(null)
 
     try {
-      const falApiKey = import.meta.env.VITE_FAL_API_KEY
+      const falApiKey = import.meta.env.VITE_FAL_KEY
       const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY
 
       // Debug: Vérifier que la clé API Fal.ai est présente
       if (!falApiKey) {
-        addLog('❌ ERREUR: Clé API Fal.ai manquante (VITE_FAL_API_KEY)')
-        throw new Error('Clé API Fal.ai non configurée. Vérifiez VITE_FAL_API_KEY dans les variables d\'environnement.')
+        addLog('❌ ERREUR: Clé API Fal.ai manquante (VITE_FAL_KEY)')
+        throw new Error('Clé API Fal.ai non configurée. Vérifiez VITE_FAL_KEY dans les variables d\'environnement.')
       }
       addLog('🔑 Clé API Fal.ai détectée', {
         keyPrefix: falApiKey.substring(0, 8) + '...',
