@@ -355,6 +355,16 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       const falApiKey = import.meta.env.VITE_FAL_API_KEY
       const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY
 
+      // Debug: Vérifier que la clé API Fal.ai est présente
+      if (!falApiKey) {
+        addLog('❌ ERREUR: Clé API Fal.ai manquante (VITE_FAL_API_KEY)')
+        throw new Error('Clé API Fal.ai non configurée. Vérifiez VITE_FAL_API_KEY dans les variables d\'environnement.')
+      }
+      addLog('🔑 Clé API Fal.ai détectée', {
+        keyPrefix: falApiKey.substring(0, 8) + '...',
+        keyLength: falApiKey.length
+      })
+
       // Vérifier si on a une image (pas un PDF) dans les fichiers uploadés
       const imageFile = brandGuideFiles.find(f => f.type.startsWith('image/'))
       const hasImage = !!imageFile
@@ -385,14 +395,8 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         ? 'fal-ai/veo3.1/image-to-video'
         : 'fal-ai/veo3.1'
 
-      addLog(`📤 Envoi requête à Fal.ai (${endpoint})...`, {
-        prompt: fullVideoPrompt.substring(0, 200) + '...',
-        duration: videoConfig.duration,
-        aspectRatio: videoConfig.aspectRatio
-      })
-
-      // Étape 4: Préparer le body de la requête
-      const requestBody = {
+      // Étape 4: Préparer le body de la requête (format Fal.ai avec wrapper "input")
+      const inputParams = {
         prompt: fullVideoPrompt,
         duration: videoConfig.duration,
         aspect_ratio: videoConfig.aspectRatio,
@@ -408,8 +412,19 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
           reader.onerror = reject
           reader.readAsDataURL(imageFile)
         })
-        requestBody.image_url = imageDataUrl
+        inputParams.image_url = imageDataUrl
       }
+
+      // Format Fal.ai: les paramètres doivent être dans un objet "input"
+      const requestBody = { input: inputParams }
+
+      addLog(`📤 Envoi requête à Fal.ai (${endpoint})...`, {
+        url: `https://queue.fal.run/${endpoint}`,
+        prompt: fullVideoPrompt.substring(0, 200) + '...',
+        duration: inputParams.duration,
+        aspectRatio: inputParams.aspect_ratio,
+        hasImageUrl: !!inputParams.image_url
+      })
 
       // Étape 5: Appeler l'API Fal.ai
       const response = await fetch(`https://queue.fal.run/${endpoint}`, {
