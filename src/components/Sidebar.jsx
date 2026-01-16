@@ -78,7 +78,7 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onMod
         <p className="mode-description">
           {generationMode === 'image'
             ? 'Nano Banana Pro génère des images marketing haute qualité'
-            : 'Veo 2 crée des vidéos de haute qualité'
+            : 'Veo 3.1 (Fal.ai) crée des vidéos de haute qualité'
           }
         </p>
       </div>
@@ -198,7 +198,7 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onMod
             </>
           ) : (
             <>
-              <p><strong>Modèle:</strong> Veo 2</p>
+              <p><strong>Modèle:</strong> Veo 3.1 (Fal.ai)</p>
               <p><strong>Résolution:</strong> HD</p>
               <p><strong>Format:</strong> MP4</p>
             </>

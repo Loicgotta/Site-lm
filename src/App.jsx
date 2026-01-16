@@ -274,7 +274,73 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
     }
   }, [prompt, brandGuideFiles])
 
-  // Génération de vidéo avec Veo 2 (API Key)
+  // Agent IA pour analyser le prompt et décider des paramètres vidéo
+  const analyzeVideoRequest = useCallback(async (userPrompt, hasImage) => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+
+    const analysisPrompt = `Tu es un agent IA qui analyse les demandes de génération vidéo.
+
+DEMANDE UTILISATEUR: "${userPrompt}"
+IMAGE FOURNIE: ${hasImage ? 'Oui' : 'Non'}
+
+Analyse cette demande et réponds UNIQUEMENT en JSON valide avec ce format:
+{
+  "useImageToVideo": ${hasImage ? 'true ou false selon si l\'image doit être animée' : 'false'},
+  "duration": "8s",
+  "aspectRatio": "16:9",
+  "resolution": "720p",
+  "generateAudio": true,
+  "enhancedPrompt": "prompt amélioré et détaillé pour la génération vidéo"
+}
+
+Règles:
+- useImageToVideo: true SEULEMENT si une image est fournie ET que l'utilisateur veut l'animer
+- duration: "4s", "6s" ou "8s" (défaut: "8s")
+- aspectRatio: "16:9" ou "9:16" (défaut: "16:9")
+- resolution: "720p" ou "1080p" (défaut: "720p")
+- enhancedPrompt: améliore le prompt pour une meilleure génération vidéo
+
+Réponds UNIQUEMENT avec le JSON, sans autre texte.`
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: analysisPrompt }] }],
+            generationConfig: { temperature: 0.3 }
+          })
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Erreur analyse agent')
+      }
+
+      const data = await response.json()
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+
+      // Nettoyer le JSON (enlever les backticks markdown si présents)
+      const cleanJson = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+
+      return JSON.parse(cleanJson)
+    } catch (err) {
+      console.error('Agent analysis error:', err)
+      // Valeurs par défaut si l'agent échoue
+      return {
+        useImageToVideo: hasImage,
+        duration: "8s",
+        aspectRatio: "16:9",
+        resolution: "720p",
+        generateAudio: true,
+        enhancedPrompt: userPrompt
+      }
+    }
+  }, [])
+
+  // Génération de vidéo avec Fal.ai Veo 3.1
   const handleGenerateVideo = useCallback(async () => {
     if (!prompt.trim()) {
       setError('Veuillez entrer un prompt pour générer une vidéo.')
@@ -286,145 +352,152 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
     setError(null)
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+      const falApiKey = import.meta.env.VITE_FAL_API_KEY
+      const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY
 
-      // Étape 1: Analyser le guide de marque avec l'agent IA
-      let brandGuidelines = ''
-      if (brandGuideFiles.length > 0) {
-        if (!brandAnalysis) {
-          const analysis = await analyzeBrandGuide()
-          setBrandAnalysis(analysis)
-          brandGuidelines = analysis
-        } else {
-          brandGuidelines = brandAnalysis
-        }
-      }
+      // Vérifier si on a une image (pas un PDF) dans les fichiers uploadés
+      const imageFile = brandGuideFiles.find(f => f.type.startsWith('image/'))
+      const hasImage = !!imageFile
+
+      addLog('🤖 Agent IA analyse la demande...', { hasImage })
+
+      // Étape 1: Agent IA analyse le prompt et décide des paramètres
+      const videoConfig = await analyzeVideoRequest(prompt, hasImage)
+      addLog('📋 Configuration vidéo décidée par l\'agent', videoConfig)
 
       setIsAnalyzing(false)
 
-      // Étape 2: Construire le prompt enrichi pour Veo 2
-      // Veo fonctionne mieux avec des descriptions visuelles simples
-      let fullVideoPrompt = prompt
+      // Étape 2: Préparer le prompt enrichi avec le guide de marque
+      let fullVideoPrompt = videoConfig.enhancedPrompt || prompt
 
-      if (brandGuidelines) {
-        // Combiner le style de marque avec la demande utilisateur
-        fullVideoPrompt = `${prompt}. ${brandGuidelines}`
+      if (brandGuideFiles.length > 0 && !brandAnalysis) {
+        const analysis = await analyzeBrandGuide()
+        setBrandAnalysis(analysis)
+        if (analysis) {
+          fullVideoPrompt = `${fullVideoPrompt}. Style visuel: ${analysis}`
+        }
+      } else if (brandAnalysis) {
+        fullVideoPrompt = `${fullVideoPrompt}. Style visuel: ${brandAnalysis}`
       }
 
-      // Étape 3: Appeler l'API Veo 2 pour générer la vidéo
-      addLog('📤 Envoi requête à Veo 2...', { prompt: fullVideoPrompt.substring(0, 200) + '...' })
+      // Étape 3: Déterminer l'endpoint Fal.ai
+      const endpoint = videoConfig.useImageToVideo && imageFile
+        ? 'fal-ai/veo3.1/image-to-video'
+        : 'fal-ai/veo3.1'
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          body: JSON.stringify({
-            instances: [{
-              prompt: fullVideoPrompt
-            }]
-          })
-        }
-      )
+      addLog(`📤 Envoi requête à Fal.ai (${endpoint})...`, {
+        prompt: fullVideoPrompt.substring(0, 200) + '...',
+        duration: videoConfig.duration,
+        aspectRatio: videoConfig.aspectRatio
+      })
+
+      // Étape 4: Préparer le body de la requête
+      const requestBody = {
+        prompt: fullVideoPrompt,
+        duration: videoConfig.duration,
+        aspect_ratio: videoConfig.aspectRatio,
+        resolution: videoConfig.resolution,
+        generate_audio: videoConfig.generateAudio
+      }
+
+      // Si image-to-video, convertir l'image en base64 data URL
+      if (videoConfig.useImageToVideo && imageFile) {
+        const reader = new FileReader()
+        const imageDataUrl = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = reject
+          reader.readAsDataURL(imageFile)
+        })
+        requestBody.image_url = imageDataUrl
+      }
+
+      // Étape 5: Appeler l'API Fal.ai
+      const response = await fetch(`https://queue.fal.run/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Key ${falApiKey}`
+        },
+        body: JSON.stringify(requestBody)
+      })
 
       addLog(`📥 Réponse initiale: ${response.status} ${response.statusText}`)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        addLog('❌ Erreur API', errorData)
-        if (response.status === 404) {
-          throw new Error('Veo 2 n\'est pas disponible. Vérifiez que votre clé API a accès à ce modèle.')
-        }
-        if (response.status === 403) {
-          throw new Error('Accès refusé à Veo 2. Ce modèle nécessite un abonnement payant.')
-        }
-        throw new Error(errorData.error?.message || `Erreur ${response.status}: ${JSON.stringify(errorData)}`)
+        addLog('❌ Erreur API Fal.ai', errorData)
+        throw new Error(errorData.detail || errorData.message || `Erreur ${response.status}`)
       }
 
       const data = await response.json()
-      addLog('✅ Opération créée', data)
+      addLog('✅ Requête acceptée', data)
 
-      const operationName = data.name
+      // Étape 6: Polling pour attendre le résultat
+      const requestId = data.request_id
+      if (!requestId) {
+        throw new Error('Pas de request_id dans la réponse')
+      }
 
-      if (operationName) {
-        addLog(`🔄 Polling opération: ${operationName}`)
+      addLog(`🔄 Polling pour request_id: ${requestId}`)
 
-        let videoResult = null
-        let attempts = 0
-        const maxAttempts = 60
+      let videoResult = null
+      let attempts = 0
+      const maxAttempts = 120 // 10 minutes max (5s * 120)
 
-        while (!videoResult && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 5000))
-          attempts++
+      while (!videoResult && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 5000))
+        attempts++
 
-          const statusResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+        const statusResponse = await fetch(
+          `https://queue.fal.run/${endpoint}/requests/${requestId}/status`,
+          {
+            headers: {
+              'Authorization': `Key ${falApiKey}`
+            }
+          }
+        )
+
+        const statusData = await statusResponse.json()
+        addLog(`🔍 Polling #${attempts}`, { status: statusData.status })
+
+        if (statusData.status === 'COMPLETED') {
+          // Récupérer le résultat
+          const resultResponse = await fetch(
+            `https://queue.fal.run/${endpoint}/requests/${requestId}`,
             {
               headers: {
-                'x-goog-api-key': apiKey
+                'Authorization': `Key ${falApiKey}`
               }
             }
           )
-
-          const statusData = await statusResponse.json()
-          addLog(`🔍 Polling #${attempts}`, {
-            done: statusData.done,
-            hasResponse: !!statusData.response,
-            hasError: !!statusData.error,
-            metadata: statusData.metadata,
-            fullResponse: statusData
-          })
-
-          if (statusData.done) {
-            // Vérifier si la vidéo a été filtrée par RAI (Responsible AI)
-            const generateVideoResponse = statusData.response?.generateVideoResponse
-            if (generateVideoResponse?.raiMediaFilteredCount > 0) {
-              const reason = generateVideoResponse.raiMediaFilteredReasons?.[0] || 'Contenu filtré par les politiques de sécurité'
-              addLog('🚫 Vidéo filtrée par RAI', generateVideoResponse)
-              throw new Error(`Vidéo bloquée par Google: ${reason}`)
-            }
-
-            // Chercher les vidéos générées dans différents formats de réponse
-            if (generateVideoResponse?.generatedSamples) {
-              videoResult = generateVideoResponse.generatedSamples
-              addLog('✅ Vidéo générée (generateVideoResponse.generatedSamples)', videoResult)
-            } else if (statusData.response?.generatedSamples) {
-              videoResult = statusData.response.generatedSamples
-              addLog('✅ Vidéo générée (generatedSamples)', videoResult)
-            } else if (statusData.response?.videos) {
-              videoResult = statusData.response.videos
-              addLog('✅ Vidéo générée (videos)', videoResult)
-            } else if (statusData.error) {
-              addLog('❌ Erreur dans la réponse', statusData.error)
-              throw new Error(statusData.error.message || JSON.stringify(statusData.error))
-            } else {
-              addLog('⚠️ Réponse done=true mais pas de vidéo', statusData)
-              throw new Error(`Réponse inattendue: ${JSON.stringify(statusData)}`)
-            }
-          }
+          const resultData = await resultResponse.json()
+          addLog('✅ Vidéo générée!', resultData)
+          videoResult = resultData
+        } else if (statusData.status === 'FAILED') {
+          addLog('❌ Génération échouée', statusData)
+          throw new Error(statusData.error || 'La génération vidéo a échoué')
         }
+      }
 
-        if (!videoResult) {
-          addLog('⏰ Timeout après ' + attempts + ' tentatives')
-          throw new Error('Timeout: La génération de la vidéo prend trop de temps.')
-        }
+      if (!videoResult) {
+        throw new Error('Timeout: La génération prend trop de temps')
+      }
 
-        // Ajouter les vidéos générées
-        const newVideos = videoResult.map(video => ({
+      // Étape 7: Ajouter la vidéo aux résultats
+      const videoUrl = videoResult.video?.url || videoResult.output?.video?.url
+      if (videoUrl) {
+        const newVideo = {
           id: Date.now() + Math.random(),
-          data: video.video?.uri || video.uri || video.gcsUri || `data:video/mp4;base64,${video.bytesBase64Encoded || video.video?.videoBytes}`,
+          data: videoUrl,
           prompt: prompt,
           timestamp: new Date().toISOString(),
           type: 'video',
-          brandAnalysis: brandGuidelines
-        }))
-
-        setGeneratedVideos(prev => [...newVideos, ...prev])
+          config: videoConfig
+        }
+        setGeneratedVideos(prev => [newVideo, ...prev])
+        addLog('🎬 Vidéo ajoutée à la galerie', { url: videoUrl })
       } else {
-        throw new Error('Réponse inattendue de l\'API Veo 2')
+        throw new Error('URL de la vidéo non trouvée dans la réponse')
       }
 
     } catch (err) {
@@ -434,7 +507,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
       setIsGenerating(false)
       setIsAnalyzing(false)
     }
-  }, [prompt, brandGuideFiles, brandAnalysis, analyzeBrandGuide, addLog])
+  }, [prompt, brandGuideFiles, brandAnalysis, analyzeBrandGuide, analyzeVideoRequest, addLog])
 
   // Handler principal de génération
   const handleGenerate = useCallback(() => {
