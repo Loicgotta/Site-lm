@@ -550,21 +550,32 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         attempts++
 
         // URL format basé sur n8n: /requests/{request_id} (sans /status)
-        // La réponse contient le statut ET le résultat si terminé
-        const statusResponse = await fetch(
-          `/api/fal/${endpoint}/requests/${requestId}`
-        )
+        const pollingUrl = `/api/fal/${endpoint}/requests/${requestId}`
+        addLog(`🔄 Polling #${attempts}`, { url: pollingUrl })
 
+        const statusResponse = await fetch(pollingUrl)
         const statusData = await statusResponse.json()
-        addLog(`🔍 Polling #${attempts}`, { status: statusData.status, hasVideo: !!statusData.video })
 
-        if (statusData.status === 'COMPLETED' || statusData.video) {
-          // Le résultat est directement dans la réponse
-          addLog('✅ Vidéo générée!', statusData)
-          videoResult = statusData
+        // Log COMPLET de la réponse pour debug
+        addLog(`📦 Réponse polling #${attempts}`, {
+          status: statusData.status,
+          keys: Object.keys(statusData),
+          hasVideo: !!statusData.video,
+          hasData: !!statusData.data,
+          hasOutput: !!statusData.output,
+          fullResponse: JSON.stringify(statusData).substring(0, 500)
+        })
+
+        // Vérifier plusieurs formats de réponse possibles
+        const video = statusData.video || statusData.data?.video || statusData.output?.video
+        const isCompleted = statusData.status === 'COMPLETED' || video
+
+        if (isCompleted && video) {
+          addLog('✅ Vidéo générée!', { videoUrl: video.url })
+          videoResult = { video }
         } else if (statusData.status === 'FAILED') {
           addLog('❌ Génération échouée', statusData)
-          throw new Error(statusData.error || 'La génération vidéo a échoué')
+          throw new Error(statusData.error || statusData.message || 'La génération vidéo a échoué')
         }
         // Si IN_QUEUE ou IN_PROGRESS, continuer le polling
       }
