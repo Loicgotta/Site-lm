@@ -549,30 +549,42 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         await new Promise(resolve => setTimeout(resolve, 5000))
         attempts++
 
-        // URL format basé sur n8n: /requests/{request_id} (sans /status)
-        const pollingUrl = `/api/fal/${endpoint}/requests/${requestId}`
-        addLog(`🔄 Polling #${attempts}`, { url: pollingUrl })
+        // Étape 1: Vérifier le STATUS avec /requests/{id}/status
+        const statusUrl = `/api/fal/${endpoint}/requests/${requestId}/status`
+        addLog(`🔄 Polling status #${attempts}`, { url: statusUrl })
 
-        const statusResponse = await fetch(pollingUrl)
+        const statusResponse = await fetch(statusUrl)
         const statusData = await statusResponse.json()
 
-        // Log COMPLET de la réponse pour debug
-        addLog(`📦 Réponse polling #${attempts}`, {
+        addLog(`📊 Status #${attempts}`, {
           status: statusData.status,
-          keys: Object.keys(statusData),
-          hasVideo: !!statusData.video,
-          hasData: !!statusData.data,
-          hasOutput: !!statusData.output,
-          fullResponse: JSON.stringify(statusData).substring(0, 500)
+          keys: Object.keys(statusData)
         })
 
-        // Vérifier plusieurs formats de réponse possibles
-        const video = statusData.video || statusData.data?.video || statusData.output?.video
-        const isCompleted = statusData.status === 'COMPLETED' || video
+        if (statusData.status === 'COMPLETED') {
+          // Étape 2: Récupérer le RÉSULTAT avec /requests/{id}
+          const resultUrl = `/api/fal/${endpoint}/requests/${requestId}`
+          addLog(`📥 Récupération du résultat...`, { url: resultUrl })
 
-        if (isCompleted && video) {
-          addLog('✅ Vidéo générée!', { videoUrl: video.url })
-          videoResult = { video }
+          const resultResponse = await fetch(resultUrl)
+          const resultData = await resultResponse.json()
+
+          addLog(`📦 Résultat reçu`, {
+            keys: Object.keys(resultData),
+            hasData: !!resultData.data,
+            hasVideo: !!resultData.video,
+            fullResponse: JSON.stringify(resultData).substring(0, 500)
+          })
+
+          // Le résultat est dans resultData.data.video selon la doc
+          const video = resultData.data?.video || resultData.video || resultData.output?.video
+          if (video?.url) {
+            addLog('✅ Vidéo générée!', { videoUrl: video.url })
+            videoResult = { video }
+          } else {
+            addLog('⚠️ Vidéo non trouvée dans le résultat', resultData)
+            throw new Error('URL de la vidéo non trouvée dans la réponse')
+          }
         } else if (statusData.status === 'FAILED') {
           addLog('❌ Génération échouée', statusData)
           throw new Error(statusData.error || statusData.message || 'La génération vidéo a échoué')
