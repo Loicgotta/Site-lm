@@ -521,9 +521,9 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
 
       addLog(`✅ Requête soumise avec request_id: ${requestId}`)
 
-      // Étape 7: Attendre 1 minute puis appeler le webhook pour récupérer la vidéo
-      addLog('⏳ Attente de 1 minute avant de récupérer la vidéo...')
-      await new Promise(resolve => setTimeout(resolve, 60000)) // 60 secondes
+      // Étape 7: Attendre 2 minutes puis appeler le webhook pour récupérer la vidéo
+      addLog('⏳ Attente de 2 minutes avant de récupérer la vidéo...')
+      await new Promise(resolve => setTimeout(resolve, 120000)) // 120 secondes = 2 minutes
 
       // Appeler le webhook n8n pour récupérer l'URL de la vidéo
       const webhookUrl = 'https://n8n.srv793731.hstgr.cloud/webhook/Kilou-video-images'
@@ -538,16 +538,15 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       })
 
       if (!webhookResponse.ok) {
-        const errorData = await webhookResponse.json().catch(() => ({}))
-        addLog('❌ Erreur webhook', errorData)
-        throw new Error(errorData.message || `Erreur webhook: ${webhookResponse.status}`)
+        const errorText = await webhookResponse.text().catch(() => '')
+        addLog('❌ Erreur webhook', { status: webhookResponse.status, errorText })
+        throw new Error(`Erreur webhook: ${webhookResponse.status}`)
       }
 
-      const webhookData = await webhookResponse.json()
-      addLog('📦 Réponse du webhook', webhookData)
+      // Le webhook renvoie directement l'URL de la vidéo en JSON
+      const videoUrl = await webhookResponse.json()
+      addLog('📦 URL vidéo reçue du webhook', { videoUrl })
 
-      // Extraire l'URL de la vidéo de la réponse du webhook
-      const videoUrl = webhookData.url || webhookData.video_url || webhookData.video?.url || webhookData.data?.video?.url
       if (videoUrl) {
         const newVideo = {
           id: Date.now() + Math.random(),
@@ -559,7 +558,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         setGeneratedVideos(prev => [newVideo, ...prev])
         addLog('🎬 Vidéo ajoutée à la galerie', { url: videoUrl })
       } else {
-        addLog('⚠️ URL vidéo non trouvée dans la réponse webhook', webhookData)
+        addLog('⚠️ URL vidéo vide dans la réponse webhook')
         throw new Error('URL de la vidéo non trouvée dans la réponse du webhook')
       }
 
