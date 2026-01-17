@@ -126,10 +126,15 @@ function App() {
     setBrandGuideFiles(files)
     // Reset brand analysis when files change
     setBrandAnalysis(null)
-    // Vérifier si une image est uploadée (pas PDF)
-    const imageFile = files.find(f => f.type.startsWith('image/'))
-    setHasUploadedImage(imageFile ? 1 : 0)
-    console.log('📁 Fichiers uploadés:', files.length, '| Image détectée:', imageFile ? 1 : 0)
+    // Vérifier si une image est uploadée (recherche robuste par type MIME ou extension)
+    const imageFile = files.find(f => {
+      if (f.type && f.type.startsWith('image/')) return true
+      const ext = f.name?.toLowerCase().split('.').pop()
+      return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)
+    })
+    const hasImage = imageFile ? 1 : 0
+    setHasUploadedImage(hasImage)
+    console.log('📁 Fichiers uploadés:', files.length, '| Image détectée:', hasImage, imageFile ? `(${imageFile.name})` : '')
   }, [])
 
   const handlePromptChange = useCallback((newPrompt) => {
@@ -392,12 +397,29 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       })
 
       // Utiliser la variable d'état hasUploadedImage pour déterminer si une image est présente
-      const imageFile = brandGuideFiles.find(f => f.type.startsWith('image/'))
+      // Recherche robuste de l'image: par type MIME ou par extension
+      const imageFile = brandGuideFiles.find(f => {
+        if (f.type && f.type.startsWith('image/')) return true
+        // Fallback: vérifier par extension si type est vide
+        const ext = f.name?.toLowerCase().split('.').pop()
+        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)
+      })
 
       addLog('📁 État des fichiers uploadés', {
         hasUploadedImage: hasUploadedImage,
         nombreFichiers: brandGuideFiles.length,
+        fichiers: brandGuideFiles.map(f => ({ name: f.name, type: f.type || 'type inconnu' })),
         imageFile: imageFile ? { name: imageFile.name, type: imageFile.type, size: imageFile.size } : null
+      })
+
+      // DÉCISION SIMPLIFIÉE: Si hasUploadedImage = 1, on utilise TOUJOURS image-to-video
+      // On ne dépend plus de la décision de l'agent
+      const useImageToVideo = hasUploadedImage === 1
+
+      addLog('🎯 Décision image-to-video', {
+        hasUploadedImage,
+        useImageToVideo,
+        raison: useImageToVideo ? 'Image uploadée → image-to-video' : 'Pas d\'image → text-to-video'
       })
 
       addLog('🤖 Agent IA analyse la demande...', { hasUploadedImage })
@@ -422,20 +444,12 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         fullVideoPrompt = `${fullVideoPrompt}. Style visuel: ${brandAnalysis}`
       }
 
-      // Étape 3: Déterminer l'endpoint Fal.ai basé sur hasUploadedImage
-      // SIMPLIFIÉ: Si une image est uploadée (hasUploadedImage = 1), on utilise TOUJOURS image-to-video
-      const useImageToVideo = hasUploadedImage === 1 && imageFile
+      // Étape 3: Déterminer l'endpoint Fal.ai basé sur useImageToVideo (déjà décidé plus haut)
       const endpoint = useImageToVideo
         ? 'fal-ai/veo3.1/image-to-video'
         : 'fal-ai/veo3.1'
 
-      addLog('🎯 Endpoint sélectionné', {
-        hasUploadedImage,
-        imageFilePresent: !!imageFile,
-        imageFileName: imageFile?.name || 'aucun',
-        useImageToVideo,
-        endpoint
-      })
+      addLog('🎯 Endpoint sélectionné', { endpoint })
 
       // Étape 4: Préparer le body de la requête
       const inputParams = {
@@ -447,41 +461,41 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       }
 
       // Si image-to-video, convertir l'image en base64 data URL et l'ajouter à la requête
-      // Rechercher à nouveau l'image pour s'assurer qu'on l'a
-      const imageToSend = brandGuideFiles.find(f => f.type && f.type.startsWith('image/'))
+      if (useImageToVideo) {
+        // Utiliser imageFile trouvé plus haut (recherche robuste déjà faite)
+        const imageToSend = imageFile
 
-      addLog('🔍 Recherche image pour envoi', {
-        brandGuideFilesCount: brandGuideFiles.length,
-        filesTypes: brandGuideFiles.map(f => ({ name: f.name, type: f.type })),
-        imageToSend: imageToSend ? { name: imageToSend.name, type: imageToSend.type } : null
-      })
-
-      if (useImageToVideo && imageToSend) {
-        addLog('🖼️ Conversion de l\'image en base64...', {
-          fileName: imageToSend.name,
-          fileType: imageToSend.type,
-          fileSize: imageToSend.size
+        addLog('🔍 Préparation image pour envoi', {
+          imageToSend: imageToSend ? { name: imageToSend.name, type: imageToSend.type, size: imageToSend.size } : 'AUCUNE IMAGE TROUVÉE!'
         })
 
-        const reader = new FileReader()
-        const imageDataUrl = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result)
-          reader.onerror = reject
-          reader.readAsDataURL(imageToSend)
-        })
-        inputParams.image_url = imageDataUrl
+        if (imageToSend) {
+          addLog('🖼️ Conversion de l\'image en base64...', {
+            fileName: imageToSend.name,
+            fileType: imageToSend.type,
+            fileSize: imageToSend.size
+          })
 
-        addLog('✅ Image convertie et ajoutée au body', {
-          dataUrlLength: imageDataUrl.length,
-          dataUrlPrefix: imageDataUrl.substring(0, 50) + '...'
-        })
-      } else if (hasUploadedImage === 1) {
-        addLog('⚠️ Image uploadée mais non trouvée pour envoi!', {
-          hasUploadedImage,
-          useImageToVideo,
-          imageToSendFound: !!imageToSend,
-          brandGuideFilesCount: brandGuideFiles.length
-        })
+          const reader = new FileReader()
+          const imageDataUrl = await new Promise((resolve, reject) => {
+            reader.onload = () => resolve(reader.result)
+            reader.onerror = reject
+            reader.readAsDataURL(imageToSend)
+          })
+          inputParams.image_url = imageDataUrl
+
+          addLog('✅ Image convertie et ajoutée au body', {
+            dataUrlLength: imageDataUrl.length,
+            dataUrlPrefix: imageDataUrl.substring(0, 50) + '...'
+          })
+        } else {
+          addLog('⚠️ ERREUR: Image attendue mais non trouvée!', {
+            hasUploadedImage,
+            brandGuideFilesCount: brandGuideFiles.length,
+            fichiers: brandGuideFiles.map(f => ({ name: f.name, type: f.type }))
+          })
+          throw new Error('Image uploadée introuvable. Veuillez ré-uploader l\'image.')
+        }
       }
 
       // Format Fal.ai REST API: les paramètres sont directement dans le body (pas de wrapper "input")
