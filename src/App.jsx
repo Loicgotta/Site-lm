@@ -18,6 +18,7 @@ function App() {
   const [logs, setLogs] = useState([]) // Logs pour debug
   const [oauthToken, setOauthToken] = useState(null) // Token OAuth pour Veo
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [hasUploadedImage, setHasUploadedImage] = useState(0) // 0 = pas d'image, 1 = image uploadée
 
   // Fonction pour ajouter un log
   const addLog = useCallback((message, data = null) => {
@@ -125,6 +126,10 @@ function App() {
     setBrandGuideFiles(files)
     // Reset brand analysis when files change
     setBrandAnalysis(null)
+    // Vérifier si une image est uploadée (pas PDF)
+    const imageFile = files.find(f => f.type.startsWith('image/'))
+    setHasUploadedImage(imageFile ? 1 : 0)
+    console.log('📁 Fichiers uploadés:', files.length, '| Image détectée:', imageFile ? 1 : 0)
   }, [])
 
   const handlePromptChange = useCallback((newPrompt) => {
@@ -386,14 +391,20 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         keyLength: falApiKey.length
       })
 
-      // Vérifier si on a une image (pas un PDF) dans les fichiers uploadés
+      // Utiliser la variable d'état hasUploadedImage pour déterminer si une image est présente
       const imageFile = brandGuideFiles.find(f => f.type.startsWith('image/'))
-      const hasImage = !!imageFile
 
-      addLog('🤖 Agent IA analyse la demande...', { hasImage })
+      addLog('📁 État des fichiers uploadés', {
+        hasUploadedImage: hasUploadedImage,
+        nombreFichiers: brandGuideFiles.length,
+        imageFile: imageFile ? { name: imageFile.name, type: imageFile.type, size: imageFile.size } : null
+      })
+
+      addLog('🤖 Agent IA analyse la demande...', { hasUploadedImage })
 
       // Étape 1: Agent IA analyse le prompt et décide des paramètres
-      const videoConfig = await analyzeVideoRequest(prompt, hasImage)
+      // Utilise hasUploadedImage (1 = image présente, 0 = pas d'image)
+      const videoConfig = await analyzeVideoRequest(prompt, hasUploadedImage === 1)
       addLog('📋 Configuration vidéo décidée par l\'agent', videoConfig)
 
       setIsAnalyzing(false)
@@ -411,12 +422,22 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         fullVideoPrompt = `${fullVideoPrompt}. Style visuel: ${brandAnalysis}`
       }
 
-      // Étape 3: Déterminer l'endpoint Fal.ai
-      const endpoint = videoConfig.useImageToVideo && imageFile
+      // Étape 3: Déterminer l'endpoint Fal.ai basé sur hasUploadedImage
+      // Si hasUploadedImage = 1 ET l'agent veut utiliser l'image, on utilise image-to-video
+      const useImageToVideo = hasUploadedImage === 1 && videoConfig.useImageToVideo && imageFile
+      const endpoint = useImageToVideo
         ? 'fal-ai/veo3.1/image-to-video'
         : 'fal-ai/veo3.1'
 
-      // Étape 4: Préparer le body de la requête (format Fal.ai avec wrapper "input")
+      addLog('🎯 Endpoint sélectionné', {
+        hasUploadedImage,
+        agentDecision: videoConfig.useImageToVideo,
+        imageFilePresent: !!imageFile,
+        useImageToVideo,
+        endpoint
+      })
+
+      // Étape 4: Préparer le body de la requête
       const inputParams = {
         prompt: fullVideoPrompt,
         duration: videoConfig.duration,
@@ -425,8 +446,14 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         generate_audio: videoConfig.generateAudio
       }
 
-      // Si image-to-video, convertir l'image en base64 data URL
-      if (videoConfig.useImageToVideo && imageFile) {
+      // Si image-to-video, convertir l'image en base64 data URL et l'ajouter à la requête
+      if (useImageToVideo && imageFile) {
+        addLog('🖼️ Conversion de l\'image en base64...', {
+          fileName: imageFile.name,
+          fileType: imageFile.type,
+          fileSize: imageFile.size
+        })
+
         const reader = new FileReader()
         const imageDataUrl = await new Promise((resolve, reject) => {
           reader.onload = () => resolve(reader.result)
@@ -434,6 +461,11 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
           reader.readAsDataURL(imageFile)
         })
         inputParams.image_url = imageDataUrl
+
+        addLog('✅ Image convertie', {
+          dataUrlLength: imageDataUrl.length,
+          dataUrlPrefix: imageDataUrl.substring(0, 50) + '...'
+        })
       }
 
       // Format Fal.ai REST API: les paramètres sont directement dans le body (pas de wrapper "input")
@@ -543,7 +575,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       setIsGenerating(false)
       setIsAnalyzing(false)
     }
-  }, [prompt, brandGuideFiles, brandAnalysis, analyzeBrandGuide, analyzeVideoRequest, addLog])
+  }, [prompt, brandGuideFiles, brandAnalysis, hasUploadedImage, analyzeBrandGuide, analyzeVideoRequest, addLog])
 
   // Handler principal de génération
   const handleGenerate = useCallback(() => {
