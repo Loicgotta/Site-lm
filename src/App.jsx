@@ -108,6 +108,19 @@ function App() {
     }
   }, [])
 
+  // Debug des variables d'environnement au démarrage
+  useEffect(() => {
+    console.log('=== DEBUG ENV VARS ===')
+    console.log('VITE_FAL_KEY présent:', !!import.meta.env.VITE_FAL_KEY)
+    console.log('VITE_GEMINI_API_KEY présent:', !!import.meta.env.VITE_GEMINI_API_KEY)
+    console.log('Toutes les vars VITE_*:', Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')))
+    if (import.meta.env.VITE_FAL_KEY) {
+      console.log('VITE_FAL_KEY longueur:', import.meta.env.VITE_FAL_KEY.length)
+      console.log('VITE_FAL_KEY préfixe:', import.meta.env.VITE_FAL_KEY.substring(0, 8) + '...')
+    }
+    console.log('======================')
+  }, [])
+
   const handleFilesChange = useCallback((files) => {
     setBrandGuideFiles(files)
     // Reset brand analysis when files change
@@ -356,9 +369,17 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY
 
       // Debug: Vérifier que la clé API Fal.ai est présente
+      addLog('🔍 Vérification des variables d\'environnement...', {
+        VITE_FAL_KEY_present: !!falApiKey,
+        VITE_GEMINI_API_KEY_present: !!geminiApiKey,
+        available_vars: Object.keys(import.meta.env).filter(k => k.startsWith('VITE_'))
+      })
+
       if (!falApiKey) {
-        addLog('❌ ERREUR: Clé API Fal.ai manquante (VITE_FAL_KEY)')
-        throw new Error('Clé API Fal.ai non configurée. Vérifiez VITE_FAL_KEY dans les variables d\'environnement.')
+        addLog('❌ ERREUR: Clé API Fal.ai manquante (VITE_FAL_KEY)', {
+          tip: 'Sur Render: ajoutez VITE_FAL_KEY dans Environment Variables et redéployez'
+        })
+        throw new Error('Clé API Fal.ai non configurée. Sur Render, ajoutez la variable VITE_FAL_KEY puis cliquez sur "Manual Deploy" > "Clear build cache & deploy"')
       }
       addLog('🔑 Clé API Fal.ai détectée', {
         keyPrefix: falApiKey.substring(0, 8) + '...',
