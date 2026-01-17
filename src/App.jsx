@@ -423,16 +423,16 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       }
 
       // Étape 3: Déterminer l'endpoint Fal.ai basé sur hasUploadedImage
-      // Si hasUploadedImage = 1 ET l'agent veut utiliser l'image, on utilise image-to-video
-      const useImageToVideo = hasUploadedImage === 1 && videoConfig.useImageToVideo && imageFile
+      // SIMPLIFIÉ: Si une image est uploadée (hasUploadedImage = 1), on utilise TOUJOURS image-to-video
+      const useImageToVideo = hasUploadedImage === 1 && imageFile
       const endpoint = useImageToVideo
         ? 'fal-ai/veo3.1/image-to-video'
         : 'fal-ai/veo3.1'
 
       addLog('🎯 Endpoint sélectionné', {
         hasUploadedImage,
-        agentDecision: videoConfig.useImageToVideo,
         imageFilePresent: !!imageFile,
+        imageFileName: imageFile?.name || 'aucun',
         useImageToVideo,
         endpoint
       })
@@ -447,24 +447,40 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       }
 
       // Si image-to-video, convertir l'image en base64 data URL et l'ajouter à la requête
-      if (useImageToVideo && imageFile) {
+      // Rechercher à nouveau l'image pour s'assurer qu'on l'a
+      const imageToSend = brandGuideFiles.find(f => f.type && f.type.startsWith('image/'))
+
+      addLog('🔍 Recherche image pour envoi', {
+        brandGuideFilesCount: brandGuideFiles.length,
+        filesTypes: brandGuideFiles.map(f => ({ name: f.name, type: f.type })),
+        imageToSend: imageToSend ? { name: imageToSend.name, type: imageToSend.type } : null
+      })
+
+      if (useImageToVideo && imageToSend) {
         addLog('🖼️ Conversion de l\'image en base64...', {
-          fileName: imageFile.name,
-          fileType: imageFile.type,
-          fileSize: imageFile.size
+          fileName: imageToSend.name,
+          fileType: imageToSend.type,
+          fileSize: imageToSend.size
         })
 
         const reader = new FileReader()
         const imageDataUrl = await new Promise((resolve, reject) => {
           reader.onload = () => resolve(reader.result)
           reader.onerror = reject
-          reader.readAsDataURL(imageFile)
+          reader.readAsDataURL(imageToSend)
         })
         inputParams.image_url = imageDataUrl
 
-        addLog('✅ Image convertie', {
+        addLog('✅ Image convertie et ajoutée au body', {
           dataUrlLength: imageDataUrl.length,
           dataUrlPrefix: imageDataUrl.substring(0, 50) + '...'
+        })
+      } else if (hasUploadedImage === 1) {
+        addLog('⚠️ Image uploadée mais non trouvée pour envoi!', {
+          hasUploadedImage,
+          useImageToVideo,
+          imageToSendFound: !!imageToSend,
+          brandGuideFilesCount: brandGuideFiles.length
         })
       }
 
