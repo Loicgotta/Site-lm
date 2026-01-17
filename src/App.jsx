@@ -484,7 +484,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       // Log détaillé du body final
       addLog(`📤 Envoi requête via proxy (/api/fal/${endpoint})...`, {
         bodyKeys: Object.keys(requestBody),
-        prompt: fullVideoPrompt.substring(0, 200) + '...',
+        prompt: prompt.substring(0, 200) + '...',
         duration: requestBody.duration,
         aspect_ratio: requestBody.aspect_ratio,
         resolution: requestBody.resolution,
