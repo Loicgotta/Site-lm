@@ -549,45 +549,39 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         await new Promise(resolve => setTimeout(resolve, 5000))
         attempts++
 
-        // Étape 1: Vérifier le STATUS avec /requests/{id}/status
-        const statusUrl = `/api/fal/${endpoint}/requests/${requestId}/status`
-        addLog(`🔄 Polling status #${attempts}`, { url: statusUrl })
+        // Un seul endpoint: /requests/{id} retourne statut ET résultat
+        // (pas d'endpoint /status séparé selon le nœud n8n)
+        const resultUrl = `/api/fal/${endpoint}/requests/${requestId}`
+        addLog(`🔄 Polling #${attempts}`, { url: resultUrl })
 
-        const statusResponse = await fetch(statusUrl)
-        const statusData = await statusResponse.json()
+        const response = await fetch(resultUrl)
+        const data = await response.json()
 
-        addLog(`📊 Status #${attempts}`, {
-          status: statusData.status,
-          keys: Object.keys(statusData)
+        addLog(`📦 Réponse #${attempts}`, {
+          keys: Object.keys(data),
+          status: data.status,
+          hasVideo: !!data.video,
+          hasData: !!data.data,
+          fullResponse: JSON.stringify(data).substring(0, 500)
         })
 
-        if (statusData.status === 'COMPLETED') {
-          // Étape 2: Récupérer le RÉSULTAT avec /requests/{id}
-          const resultUrl = `/api/fal/${endpoint}/requests/${requestId}`
-          addLog(`📥 Récupération du résultat...`, { url: resultUrl })
+        // Vérifier si la vidéo est prête
+        const video = data.video || data.data?.video || data.output?.video
 
-          const resultResponse = await fetch(resultUrl)
-          const resultData = await resultResponse.json()
-
-          addLog(`📦 Résultat reçu`, {
-            keys: Object.keys(resultData),
-            hasData: !!resultData.data,
-            hasVideo: !!resultData.video,
-            fullResponse: JSON.stringify(resultData).substring(0, 500)
-          })
-
-          // Le résultat est dans resultData.data.video selon la doc
-          const video = resultData.data?.video || resultData.video || resultData.output?.video
-          if (video?.url) {
-            addLog('✅ Vidéo générée!', { videoUrl: video.url })
-            videoResult = { video }
-          } else {
-            addLog('⚠️ Vidéo non trouvée dans le résultat', resultData)
-            throw new Error('URL de la vidéo non trouvée dans la réponse')
+        if (video?.url) {
+          // Vidéo trouvée directement
+          addLog('✅ Vidéo générée!', { videoUrl: video.url })
+          videoResult = { video }
+        } else if (data.status === 'COMPLETED') {
+          // Status COMPLETED mais pas de vidéo dans cette réponse - bizarre
+          addLog('⚠️ Status COMPLETED mais pas de vidéo', data)
+          // Essayer quand même avec data.video
+          if (data.data?.video?.url) {
+            videoResult = { video: data.data.video }
           }
-        } else if (statusData.status === 'FAILED') {
-          addLog('❌ Génération échouée', statusData)
-          throw new Error(statusData.error || statusData.message || 'La génération vidéo a échoué')
+        } else if (data.status === 'FAILED' || data.error) {
+          addLog('❌ Génération échouée', data)
+          throw new Error(data.error || data.message || 'La génération vidéo a échoué')
         }
         // Si IN_QUEUE ou IN_PROGRESS, continuer le polling
       }
