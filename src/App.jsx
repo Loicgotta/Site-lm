@@ -436,8 +436,8 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         inputParams.image_url = imageDataUrl
       }
 
-      // Format Fal.ai: les paramètres doivent être dans un objet "input"
-      const requestBody = { input: inputParams }
+      // Format Fal.ai REST API: les paramètres sont directement dans le body (pas de wrapper "input")
+      const requestBody = inputParams
 
       addLog(`📤 Envoi requête à Fal.ai (${endpoint})...`, {
         url: `https://queue.fal.run/${endpoint}`,
