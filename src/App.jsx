@@ -471,12 +471,17 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       // Format Fal.ai REST API: les paramètres sont directement dans le body (pas de wrapper "input")
       const requestBody = inputParams
 
+      // Log détaillé du body final
       addLog(`📤 Envoi requête à Fal.ai (${endpoint})...`, {
         url: `https://queue.fal.run/${endpoint}`,
+        bodyKeys: Object.keys(requestBody),
         prompt: fullVideoPrompt.substring(0, 200) + '...',
-        duration: inputParams.duration,
-        aspectRatio: inputParams.aspect_ratio,
-        hasImageUrl: !!inputParams.image_url
+        duration: requestBody.duration,
+        aspect_ratio: requestBody.aspect_ratio,
+        resolution: requestBody.resolution,
+        generate_audio: requestBody.generate_audio,
+        image_url_present: !!requestBody.image_url,
+        image_url_length: requestBody.image_url ? requestBody.image_url.length : 0
       })
 
       // Étape 5: Appeler l'API Fal.ai
