@@ -502,8 +502,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       const requestBody = inputParams
 
       // Log détaillé du body final
-      addLog(`📤 Envoi requête à Fal.ai (${endpoint})...`, {
-        url: `https://queue.fal.run/${endpoint}`,
+      addLog(`📤 Envoi requête via proxy (/api/fal/${endpoint})...`, {
         bodyKeys: Object.keys(requestBody),
         prompt: fullVideoPrompt.substring(0, 200) + '...',
         duration: requestBody.duration,
@@ -514,12 +513,11 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         image_url_length: requestBody.image_url ? requestBody.image_url.length : 0
       })
 
-      // Étape 5: Appeler l'API Fal.ai
-      const response = await fetch(`https://queue.fal.run/${endpoint}`, {
+      // Étape 5: Appeler l'API Fal.ai via le proxy (évite les problèmes CORS)
+      const response = await fetch(`/api/fal/${endpoint}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Key ${falApiKey}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
       })
@@ -551,27 +549,18 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         await new Promise(resolve => setTimeout(resolve, 5000))
         attempts++
 
+        // Utiliser le proxy pour le polling (évite CORS)
         const statusResponse = await fetch(
-          `https://queue.fal.run/${endpoint}/requests/${requestId}/status`,
-          {
-            headers: {
-              'Authorization': `Key ${falApiKey}`
-            }
-          }
+          `/api/fal/${endpoint}/requests/${requestId}/status`
         )
 
         const statusData = await statusResponse.json()
         addLog(`🔍 Polling #${attempts}`, { status: statusData.status })
 
         if (statusData.status === 'COMPLETED') {
-          // Récupérer le résultat
+          // Récupérer le résultat via le proxy
           const resultResponse = await fetch(
-            `https://queue.fal.run/${endpoint}/requests/${requestId}`,
-            {
-              headers: {
-                'Authorization': `Key ${falApiKey}`
-              }
-            }
+            `/api/fal/${endpoint}/requests/${requestId}`
           )
           const resultData = await resultResponse.json()
           addLog('✅ Vidéo générée!', resultData)
