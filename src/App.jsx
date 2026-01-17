@@ -413,7 +413,6 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       })
 
       // DÉCISION SIMPLIFIÉE: Si hasUploadedImage = 1, on utilise TOUJOURS image-to-video
-      // On ne dépend plus de la décision de l'agent
       const useImageToVideo = hasUploadedImage === 1
 
       addLog('🎯 Décision image-to-video', {
@@ -422,47 +421,28 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         raison: useImageToVideo ? 'Image uploadée → image-to-video' : 'Pas d\'image → text-to-video'
       })
 
-      addLog('🤖 Agent IA analyse la demande...', { hasUploadedImage })
-
-      // Étape 1: Agent IA analyse le prompt et décide des paramètres
-      // Utilise hasUploadedImage (1 = image présente, 0 = pas d'image)
-      const videoConfig = await analyzeVideoRequest(prompt, hasUploadedImage === 1)
-      addLog('📋 Configuration vidéo décidée par l\'agent', videoConfig)
-
       setIsAnalyzing(false)
 
-      // Étape 2: Préparer le prompt enrichi avec le guide de marque
-      let fullVideoPrompt = videoConfig.enhancedPrompt || prompt
-
-      if (brandGuideFiles.length > 0 && !brandAnalysis) {
-        const analysis = await analyzeBrandGuide()
-        setBrandAnalysis(analysis)
-        if (analysis) {
-          fullVideoPrompt = `${fullVideoPrompt}. Style visuel: ${analysis}`
-        }
-      } else if (brandAnalysis) {
-        fullVideoPrompt = `${fullVideoPrompt}. Style visuel: ${brandAnalysis}`
-      }
-
-      // Étape 3: Déterminer l'endpoint Fal.ai basé sur useImageToVideo (déjà décidé plus haut)
+      // Étape 1: Déterminer l'endpoint Fal.ai
       const endpoint = useImageToVideo
         ? 'fal-ai/veo3.1/image-to-video'
         : 'fal-ai/veo3.1'
 
       addLog('🎯 Endpoint sélectionné', { endpoint })
 
-      // Étape 4: Préparer le body de la requête
+      // Étape 2: Préparer le body de la requête avec le PROMPT ORIGINAL (non modifié)
       const inputParams = {
-        prompt: fullVideoPrompt,
-        duration: videoConfig.duration,
-        aspect_ratio: videoConfig.aspectRatio,
-        resolution: videoConfig.resolution,
-        generate_audio: videoConfig.generateAudio
+        prompt: prompt, // Prompt original sans modification
+        duration: '8s',
+        aspect_ratio: '16:9',
+        resolution: '720p',
+        generate_audio: true
       }
+
+      addLog('📝 Prompt envoyé (non modifié)', { prompt: prompt })
 
       // Si image-to-video, convertir l'image en base64 data URL et l'ajouter à la requête
       if (useImageToVideo) {
-        // Utiliser imageFile trouvé plus haut (recherche robuste déjà faite)
         const imageToSend = imageFile
 
         addLog('🔍 Préparation image pour envoi', {
@@ -533,78 +513,54 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       const data = await response.json()
       addLog('✅ Requête acceptée', data)
 
-      // Étape 6: Polling pour attendre le résultat
+      // Étape 6: Récupérer le request_id
       const requestId = data.request_id
       if (!requestId) {
         throw new Error('Pas de request_id dans la réponse')
       }
 
-      addLog(`🔄 Polling pour request_id: ${requestId}`)
+      addLog(`✅ Requête soumise avec request_id: ${requestId}`)
 
-      let videoResult = null
-      let attempts = 0
-      const maxAttempts = 120 // 10 minutes max (5s * 120)
+      // Étape 7: Attendre 1 minute puis appeler le webhook pour récupérer la vidéo
+      addLog('⏳ Attente de 1 minute avant de récupérer la vidéo...')
+      await new Promise(resolve => setTimeout(resolve, 60000)) // 60 secondes
 
-      while (!videoResult && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 5000))
-        attempts++
+      // Appeler le webhook n8n pour récupérer l'URL de la vidéo
+      const webhookUrl = 'https://n8n.srv793731.hstgr.cloud/webhook/Kilou-video-images'
+      addLog('📡 Appel du webhook pour récupérer la vidéo...', { webhookUrl, requestId })
 
-        // Un seul endpoint: /requests/{id} retourne statut ET résultat
-        // (pas d'endpoint /status séparé selon le nœud n8n)
-        const resultUrl = `/api/fal/${endpoint}/requests/${requestId}`
-        addLog(`🔄 Polling #${attempts}`, { url: resultUrl })
+      const webhookResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ request_id: requestId })
+      })
 
-        const response = await fetch(resultUrl)
-        const data = await response.json()
-
-        addLog(`📦 Réponse #${attempts}`, {
-          keys: Object.keys(data),
-          status: data.status,
-          hasVideo: !!data.video,
-          hasData: !!data.data,
-          fullResponse: JSON.stringify(data).substring(0, 500)
-        })
-
-        // Vérifier si la vidéo est prête
-        const video = data.video || data.data?.video || data.output?.video
-
-        if (video?.url) {
-          // Vidéo trouvée directement
-          addLog('✅ Vidéo générée!', { videoUrl: video.url })
-          videoResult = { video }
-        } else if (data.status === 'COMPLETED') {
-          // Status COMPLETED mais pas de vidéo dans cette réponse - bizarre
-          addLog('⚠️ Status COMPLETED mais pas de vidéo', data)
-          // Essayer quand même avec data.video
-          if (data.data?.video?.url) {
-            videoResult = { video: data.data.video }
-          }
-        } else if (data.status === 'FAILED' || data.error) {
-          addLog('❌ Génération échouée', data)
-          throw new Error(data.error || data.message || 'La génération vidéo a échoué')
-        }
-        // Si IN_QUEUE ou IN_PROGRESS, continuer le polling
+      if (!webhookResponse.ok) {
+        const errorData = await webhookResponse.json().catch(() => ({}))
+        addLog('❌ Erreur webhook', errorData)
+        throw new Error(errorData.message || `Erreur webhook: ${webhookResponse.status}`)
       }
 
-      if (!videoResult) {
-        throw new Error('Timeout: La génération prend trop de temps')
-      }
+      const webhookData = await webhookResponse.json()
+      addLog('📦 Réponse du webhook', webhookData)
 
-      // Étape 7: Ajouter la vidéo aux résultats
-      const videoUrl = videoResult.video?.url || videoResult.output?.video?.url
+      // Extraire l'URL de la vidéo de la réponse du webhook
+      const videoUrl = webhookData.url || webhookData.video_url || webhookData.video?.url || webhookData.data?.video?.url
       if (videoUrl) {
         const newVideo = {
           id: Date.now() + Math.random(),
           data: videoUrl,
           prompt: prompt,
           timestamp: new Date().toISOString(),
-          type: 'video',
-          config: videoConfig
+          type: 'video'
         }
         setGeneratedVideos(prev => [newVideo, ...prev])
         addLog('🎬 Vidéo ajoutée à la galerie', { url: videoUrl })
       } else {
-        throw new Error('URL de la vidéo non trouvée dans la réponse')
+        addLog('⚠️ URL vidéo non trouvée dans la réponse webhook', webhookData)
+        throw new Error('URL de la vidéo non trouvée dans la réponse du webhook')
       }
 
     } catch (err) {
@@ -614,7 +570,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       setIsGenerating(false)
       setIsAnalyzing(false)
     }
-  }, [prompt, brandGuideFiles, brandAnalysis, hasUploadedImage, analyzeBrandGuide, analyzeVideoRequest, addLog])
+  }, [prompt, brandGuideFiles, hasUploadedImage, addLog])
 
   // Handler principal de génération
   const handleGenerate = useCallback(() => {
