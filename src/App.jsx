@@ -549,26 +549,24 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         await new Promise(resolve => setTimeout(resolve, 5000))
         attempts++
 
-        // Utiliser le proxy pour le polling (évite CORS)
+        // URL format basé sur n8n: /requests/{request_id} (sans /status)
+        // La réponse contient le statut ET le résultat si terminé
         const statusResponse = await fetch(
-          `/api/fal/${endpoint}/requests/${requestId}/status`
+          `/api/fal/${endpoint}/requests/${requestId}`
         )
 
         const statusData = await statusResponse.json()
-        addLog(`🔍 Polling #${attempts}`, { status: statusData.status })
+        addLog(`🔍 Polling #${attempts}`, { status: statusData.status, hasVideo: !!statusData.video })
 
-        if (statusData.status === 'COMPLETED') {
-          // Récupérer le résultat via le proxy
-          const resultResponse = await fetch(
-            `/api/fal/${endpoint}/requests/${requestId}`
-          )
-          const resultData = await resultResponse.json()
-          addLog('✅ Vidéo générée!', resultData)
-          videoResult = resultData
+        if (statusData.status === 'COMPLETED' || statusData.video) {
+          // Le résultat est directement dans la réponse
+          addLog('✅ Vidéo générée!', statusData)
+          videoResult = statusData
         } else if (statusData.status === 'FAILED') {
           addLog('❌ Génération échouée', statusData)
           throw new Error(statusData.error || 'La génération vidéo a échoué')
         }
+        // Si IN_QUEUE ou IN_PROGRESS, continuer le polling
       }
 
       if (!videoResult) {

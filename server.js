@@ -23,6 +23,12 @@ app.post('/api/fal/:endpoint(*)', async (req, res) => {
   const url = `https://queue.fal.run/${endpoint}`
 
   console.log(`[FAL PROXY] POST ${url}`)
+  console.log(`[FAL PROXY] API Key present: ${!!falApiKey}`)
+
+  if (!falApiKey) {
+    console.error('[FAL PROXY] ERROR: VITE_FAL_KEY not set!')
+    return res.status(500).json({ error: 'API key not configured on server' })
+  }
 
   try {
     const response = await fetch(url, {
@@ -35,10 +41,10 @@ app.post('/api/fal/:endpoint(*)', async (req, res) => {
     })
 
     const data = await response.json()
-    console.log(`[FAL PROXY] Response status: ${response.status}`)
+    console.log(`[FAL PROXY] POST Response: ${response.status}`)
     res.status(response.status).json(data)
   } catch (error) {
-    console.error('[FAL PROXY] Error:', error.message)
+    console.error('[FAL PROXY] POST Error:', error.message)
     res.status(500).json({ error: error.message })
   }
 })
@@ -50,6 +56,12 @@ app.get('/api/fal/:endpoint(*)', async (req, res) => {
   const url = `https://queue.fal.run/${endpoint}`
 
   console.log(`[FAL PROXY] GET ${url}`)
+  console.log(`[FAL PROXY] API Key present: ${!!falApiKey}`)
+
+  if (!falApiKey) {
+    console.error('[FAL PROXY] ERROR: VITE_FAL_KEY not set!')
+    return res.status(500).json({ error: 'API key not configured on server' })
+  }
 
   try {
     const response = await fetch(url, {
@@ -60,10 +72,10 @@ app.get('/api/fal/:endpoint(*)', async (req, res) => {
     })
 
     const data = await response.json()
-    console.log(`[FAL PROXY] Response status: ${response.status}`)
+    console.log(`[FAL PROXY] GET Response: ${response.status}`, { status: data.status })
     res.status(response.status).json(data)
   } catch (error) {
-    console.error('[FAL PROXY] Error:', error.message)
+    console.error('[FAL PROXY] GET Error:', error.message)
     res.status(500).json({ error: error.message })
   }
 })
@@ -76,4 +88,5 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
   console.log(`FAL_KEY present: ${!!process.env.VITE_FAL_KEY}`)
+  console.log(`FAL_KEY length: ${process.env.VITE_FAL_KEY?.length || 0}`)
 })
