@@ -543,13 +543,20 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         throw new Error(`Erreur webhook: ${webhookResponse.status}`)
       }
 
-      // Le webhook renvoie un tableau avec l'objet vidéo
-      // Format: [{ "video": { "url": "..." } }]
-      const webhookData = await webhookResponse.json()
-      addLog('📦 Réponse du webhook', { webhookData })
+      // Le webhook renvoie l'URL de la vidéo (peut être en texte brut ou JSON)
+      const responseText = await webhookResponse.text()
+      addLog('📦 Réponse du webhook (brute)', { responseText: responseText.substring(0, 200) })
 
-      // Extraire l'URL: webhookData[0].video.url
-      const videoUrl = webhookData?.[0]?.video?.url
+      // Essayer de parser en JSON, sinon utiliser le texte directement comme URL
+      let videoUrl
+      try {
+        const webhookData = JSON.parse(responseText)
+        // Format: [{ "video": { "url": "..." } }]
+        videoUrl = webhookData?.[0]?.video?.url || webhookData?.video?.url || webhookData?.url
+      } catch {
+        // Si ce n'est pas du JSON, c'est directement l'URL
+        videoUrl = responseText.trim()
+      }
       addLog('🎬 URL vidéo extraite', { videoUrl })
 
       if (videoUrl) {
