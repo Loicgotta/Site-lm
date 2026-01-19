@@ -77,8 +77,8 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onMod
         </div>
         <p className="mode-description">
           {generationMode === 'image'
-            ? 'Nano Banana Pro génère des images marketing haute qualité'
-            : 'Veo 3.1 (Fal.ai) crée des vidéos de haute qualité'
+            ? 'Génère des images marketing haute qualité'
+            : 'Crée des vidéos de haute qualité'
           }
         </p>
       </div>
@@ -204,32 +204,9 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onMod
         )}
       </div>
 
-      {/* Settings */}
-      <div className="sidebar-section">
-        <div className="sidebar-section-header">
-          <Image size={18} />
-          <h3>Paramètres</h3>
-        </div>
-        <div className="settings-info">
-          {generationMode === 'image' ? (
-            <>
-              <p><strong>Modèle:</strong> Nano Banana Pro</p>
-              <p><strong>Résolution:</strong> Jusqu'à 2K</p>
-              <p><strong>Format:</strong> PNG</p>
-            </>
-          ) : (
-            <>
-              <p><strong>Modèle:</strong> Veo 3.1 (Fal.ai)</p>
-              <p><strong>Résolution:</strong> HD</p>
-              <p><strong>Format:</strong> MP4</p>
-            </>
-          )}
-        </div>
-      </div>
-
       <div className="sidebar-footer">
         <p className="powered-by">
-          Propulsé par Google Gemini API
+          Kilou's demo
         </p>
       </div>
     </aside>
