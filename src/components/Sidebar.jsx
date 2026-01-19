@@ -104,16 +104,16 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onMod
         </div>
       )}
 
-      {/* Brand Guide Upload */}
+      {/* Reference Files Upload */}
       <div className="sidebar-section">
         <div className="sidebar-section-header">
-          <Palette size={18} />
-          <h3>Guide de marque</h3>
+          <Upload size={18} />
+          <h3>Documents de référence</h3>
         </div>
         <p className="sidebar-description">
           {generationMode === 'image'
-            ? 'Uploadez votre charte graphique pour des visuels conformes à votre identité.'
-            : 'Un agent IA analysera votre guide pour créer des vidéos parfaitement alignées avec votre marque.'
+            ? 'Uploadez vos images ou documents pour guider la génération.'
+            : 'Uploadez vos fichiers pour personnaliser la vidéo générée.'
           }
         </p>
 
