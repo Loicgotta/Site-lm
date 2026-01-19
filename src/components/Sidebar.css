@@ -82,6 +82,41 @@
   line-height: 1.4;
 }
 
+/* Duration Selector */
+.duration-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.duration-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background-color: var(--bg-input);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.duration-btn:hover {
+  border-color: var(--primary-blue);
+  color: var(--text-primary);
+}
+
+.duration-btn.active {
+  background: var(--gradient-google);
+  background-size: 200% 200%;
+  animation: gradientRotate 3s ease infinite;
+  border-color: transparent;
+  color: white;
+}
+
 .upload-zone {
   border: 2px dashed var(--border-color);
   border-radius: var(--radius-md);

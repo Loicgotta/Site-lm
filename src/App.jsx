@@ -19,6 +19,7 @@ function App() {
   const [oauthToken, setOauthToken] = useState(null) // Token OAuth pour Veo
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [hasUploadedImage, setHasUploadedImage] = useState(0) // 0 = pas d'image, 1 = image uploadée
+  const [videoDuration, setVideoDuration] = useState('8s') // Durée de la vidéo: '4s', '6s', ou '8s'
 
   // Fonction pour ajouter un log
   const addLog = useCallback((message, data = null) => {
@@ -143,6 +144,10 @@ function App() {
 
   const handleModeChange = useCallback((mode) => {
     setGenerationMode(mode)
+  }, [])
+
+  const handleVideoDurationChange = useCallback((duration) => {
+    setVideoDuration(duration)
   }, [])
 
   // Convert file to base64
@@ -433,7 +438,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       // Étape 2: Préparer le body de la requête avec le PROMPT ORIGINAL (non modifié)
       const inputParams = {
         prompt: prompt, // Prompt original sans modification
-        duration: '8s',
+        duration: videoDuration,
         aspect_ratio: '16:9',
         resolution: '720p',
         generate_audio: true
@@ -581,7 +586,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       setIsGenerating(false)
       setIsAnalyzing(false)
     }
-  }, [prompt, brandGuideFiles, hasUploadedImage, addLog])
+  }, [prompt, brandGuideFiles, hasUploadedImage, videoDuration, addLog])
 
   // Handler principal de génération
   const handleGenerate = useCallback(() => {
@@ -625,6 +630,8 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
           onFilesChange={handleFilesChange}
           generationMode={generationMode}
           onModeChange={handleModeChange}
+          videoDuration={videoDuration}
+          onVideoDurationChange={handleVideoDurationChange}
         />
         <MainContent
           prompt={prompt}
@@ -641,8 +648,6 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
           onRemoveVideo={handleRemoveVideo}
           brandGuideCount={brandGuideFiles.length}
           generationMode={generationMode}
-          logs={logs}
-          onClearLogs={() => setLogs([])}
         />
       </div>
     </div>

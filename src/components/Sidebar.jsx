@@ -1,8 +1,8 @@
 import React, { useRef } from 'react'
-import { Upload, Image, X, FileImage, Plus, Palette, FileText, Video, Sparkles } from 'lucide-react'
+import { Upload, Image, X, FileImage, Plus, Palette, FileText, Video, Sparkles, Clock } from 'lucide-react'
 import './Sidebar.css'
 
-function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onModeChange }) {
+function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onModeChange, videoDuration, onVideoDurationChange }) {
   const fileInputRef = useRef(null)
 
   const handleFileSelect = (e) => {
@@ -82,6 +82,27 @@ function Sidebar({ isOpen, brandGuideFiles, onFilesChange, generationMode, onMod
           }
         </p>
       </div>
+
+      {/* Video Duration Selector - Only in video mode */}
+      {generationMode === 'video' && (
+        <div className="sidebar-section">
+          <div className="sidebar-section-header">
+            <Clock size={18} />
+            <h3>Durée de la vidéo</h3>
+          </div>
+          <div className="duration-selector">
+            {['4s', '6s', '8s'].map((duration) => (
+              <button
+                key={duration}
+                className={`duration-btn ${videoDuration === duration ? 'active' : ''}`}
+                onClick={() => onVideoDurationChange(duration)}
+              >
+                {duration}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Brand Guide Upload */}
       <div className="sidebar-section">
