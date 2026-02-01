@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   Send,
   Loader2,
@@ -35,6 +35,19 @@ function MainContent({
 }) {
   const [selectedImage, setSelectedImage] = useState(null)
   const [selectedVideo, setSelectedVideo] = useState(null)
+  const textareaRef = useRef(null)
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto'
+      // Set the height to scrollHeight (with min and max constraints handled by CSS)
+      const newHeight = Math.min(Math.max(textarea.scrollHeight, 48), 200)
+      textarea.style.height = `${newHeight}px`
+    }
+  }, [prompt])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -329,6 +342,7 @@ function MainContent({
           )}
           <div className="prompt-input-wrapper">
             <textarea
+              ref={textareaRef}
               className="prompt-input"
               placeholder={generationMode === 'image'
                 ? "Décrivez l'image que vous souhaitez générer..."
@@ -337,7 +351,6 @@ function MainContent({
               value={prompt}
               onChange={(e) => onPromptChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              rows={1}
               disabled={isGenerating}
             />
             <button

@@ -20,6 +20,7 @@ function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [hasUploadedImage, setHasUploadedImage] = useState(0) // 0 = pas d'image, 1 = image uploadée
   const [videoDuration, setVideoDuration] = useState('8s') // Durée de la vidéo: '4s', '6s', ou '8s'
+  const [lastGeneratedImage, setLastGeneratedImage] = useState(null) // Mémoire de la dernière image générée pour modifications
 
   // Fonction pour ajouter un log
   const addLog = useCallback((message, data = null) => {
@@ -220,7 +221,7 @@ Sois CONCIS et DESCRIPTIF pour permettre la génération de vidéos cohérentes.
     return analysisText
   }, [brandGuideFiles])
 
-  // Génération d'image avec Nano Banana Pro
+  // Génération d'image avec Nano Banana Pro (avec mémoire de conversation)
   const handleGenerateImage = useCallback(async () => {
     if (!prompt.trim()) {
       setError('Veuillez entrer un prompt pour générer une image.')
@@ -234,20 +235,35 @@ Sois CONCIS et DESCRIPTIF pour permettre la génération de vidéos cohérentes.
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY
       const imageParts = await Promise.all(brandGuideFiles.map(fileToBase64))
 
-      let fullPrompt = prompt
-      if (brandGuideFiles.length > 0) {
-        fullPrompt = `INSTRUCTIONS: Tu es un expert en création de contenus marketing. Analyse attentivement le guide de marque fourni dans les ${brandGuideFiles.length} fichier(s) de référence ci-joints.
+      // Si une image a été générée précédemment, l'inclure pour permettre des modifications
+      if (lastGeneratedImage) {
+        // Extraire les données base64 de l'image précédente
+        const base64Match = lastGeneratedImage.data.match(/^data:([^;]+);base64,(.+)$/)
+        if (base64Match) {
+          imageParts.push({
+            inlineData: {
+              mimeType: base64Match[1],
+              data: base64Match[2]
+            }
+          })
+        }
+      }
 
-GUIDE DE MARQUE À RESPECTER STRICTEMENT:
+      let fullPrompt = prompt
+      if (brandGuideFiles.length > 0 || lastGeneratedImage) {
+        const hasLastImage = lastGeneratedImage ? '\n\nIMAGE PRÉCÉDENTE: Une image générée précédemment est fournie. Si l\'utilisateur demande une modification, applique les changements sur cette image.' : ''
+        fullPrompt = `INSTRUCTIONS: Tu es un expert en création de contenus marketing.${brandGuideFiles.length > 0 ? ` Analyse attentivement le guide de marque fourni dans les ${brandGuideFiles.length} fichier(s) de référence ci-joints.` : ''}${hasLastImage}
+
+${brandGuideFiles.length > 0 ? `GUIDE DE MARQUE À RESPECTER STRICTEMENT:
 - Utilise EXACTEMENT les mêmes couleurs (palette de couleurs)
 - Reproduis le logo tel qu'il apparaît dans le guide
 - Respecte la typographie et le style visuel
 - Maintiens la cohérence avec l'identité de marque
 
-DEMANDE DU CLIENT:
+` : ''}DEMANDE DU CLIENT:
 ${prompt}
 
-IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni, comme si elle était créée par l'équipe design de la marque.`
+${brandGuideFiles.length > 0 ? `IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni, comme si elle était créée par l'équipe design de la marque.` : ''}`
       }
 
       const response = await fetch(
@@ -293,6 +309,8 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
         throw new Error('Aucune image n\'a été générée. Essayez avec un prompt différent.')
       }
 
+      // Sauvegarder la dernière image générée pour la mémoire de conversation
+      setLastGeneratedImage(newImages[0])
       setGeneratedImages(prev => [...newImages, ...prev])
     } catch (err) {
       console.error('Generation error:', err)
@@ -300,7 +318,7 @@ IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni
     } finally {
       setIsGenerating(false)
     }
-  }, [prompt, brandGuideFiles])
+  }, [prompt, brandGuideFiles, lastGeneratedImage])
 
   // Agent IA pour analyser le prompt et décider des paramètres vidéo
   const analyzeVideoRequest = useCallback(async (userPrompt, hasImage) => {
@@ -607,6 +625,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
   const handleClearHistory = useCallback(() => {
     setGeneratedImages([])
     setGeneratedVideos([])
+    setLastGeneratedImage(null) // Réinitialiser la mémoire de conversation
   }, [])
 
   const handleRemoveImage = useCallback((imageId) => {
