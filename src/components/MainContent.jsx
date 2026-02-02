@@ -10,10 +10,11 @@ import {
   Image as ImageIcon,
   Video,
   Wand2,
-  Clock,
   Palette,
   Brain,
-  Play
+  Play,
+  User,
+  Bot
 } from 'lucide-react'
 import './MainContent.css'
 
@@ -23,31 +24,32 @@ function MainContent({
   onGenerate,
   isGenerating,
   isAnalyzing,
-  generatedImages,
-  generatedVideos,
+  chatMessages,
   error,
   onClearError,
   onClearHistory,
-  onRemoveImage,
-  onRemoveVideo,
   brandGuideCount,
   generationMode
 }) {
   const [selectedImage, setSelectedImage] = useState(null)
   const [selectedVideo, setSelectedVideo] = useState(null)
   const textareaRef = useRef(null)
+  const chatEndRef = useRef(null)
 
   // Auto-resize textarea based on content
   useEffect(() => {
     const textarea = textareaRef.current
     if (textarea) {
-      // Reset height to auto to get the correct scrollHeight
       textarea.style.height = 'auto'
-      // Set the height to scrollHeight (with min and max constraints handled by CSS)
       const newHeight = Math.min(Math.max(textarea.scrollHeight, 48), 200)
       textarea.style.height = `${newHeight}px`
     }
   }, [prompt])
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, isGenerating])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -56,18 +58,18 @@ function MainContent({
     }
   }
 
-  const handleDownloadImage = (image) => {
+  const handleDownloadImage = (imageData) => {
     const link = document.createElement('a')
-    link.href = image.data
+    link.href = imageData
     link.download = `kilous-demo-${Date.now()}.png`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
-  const handleDownloadVideo = (video) => {
+  const handleDownloadVideo = (videoUrl) => {
     const link = document.createElement('a')
-    link.href = video.data
+    link.href = videoUrl
     link.download = `kilous-demo-${Date.now()}.mp4`
     document.body.appendChild(link)
     link.click()
@@ -89,12 +91,12 @@ function MainContent({
   ]
 
   const examplePrompts = generationMode === 'image' ? imageExamplePrompts : videoExamplePrompts
-  const hasContent = generatedImages.length > 0 || generatedVideos.length > 0
+  const hasMessages = chatMessages.length > 0
 
   return (
     <main className="main-content">
-      {/* Hero Section when no content */}
-      {!hasContent && !isGenerating && (
+      {/* Hero Section when no messages */}
+      {!hasMessages && !isGenerating && (
         <div className="hero-section animate-fade-in">
           <div className="hero-icon">
             <Sparkles size={48} />
@@ -102,8 +104,8 @@ function MainContent({
           <h1 className="hero-title">Bienvenue sur Kilou's demo</h1>
           <p className="hero-subtitle">
             {generationMode === 'image'
-              ? 'Créez des contenus marketing conformes à votre identité de marque avec Nano Banana Pro'
-              : 'Générez des vidéos marketing professionnelles avec Veo 3.1 et votre guide de marque'
+              ? 'Créez des contenus marketing conformes à votre identité de marque'
+              : 'Générez des vidéos marketing professionnelles'
             }
           </p>
 
@@ -112,35 +114,25 @@ function MainContent({
               <div className="feature-icon">
                 <Palette size={24} />
               </div>
-              <h3>Guide de marque</h3>
-              <p>
-                {generationMode === 'image'
-                  ? 'Uploadez votre charte graphique pour des visuels 100% conformes'
-                  : 'Un agent IA analyse votre guide pour des vidéos parfaitement alignées'
-                }
-              </p>
+              <h3>Documents de référence</h3>
+              <p>Uploadez vos fichiers pour guider la génération</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon">
                 <Wand2 size={24} />
               </div>
-              <h3>{generationMode === 'image' ? 'IA Marketing' : 'Agent IA'}</h3>
-              <p>
-                {generationMode === 'image'
-                  ? 'Nano Banana Pro crée des pubs, bannières et visuels avec votre logo'
-                  : 'Gemini analyse méticuleusement votre identité visuelle'
-                }
-              </p>
+              <h3>IA Créative</h3>
+              <p>Génération intelligente basée sur vos instructions</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon">
                 {generationMode === 'image' ? <ImageIcon size={24} /> : <Video size={24} />}
               </div>
-              <h3>{generationMode === 'image' ? 'Prêt à publier' : 'Vidéo HD'}</h3>
+              <h3>{generationMode === 'image' ? 'Modification facile' : 'Vidéo HD'}</h3>
               <p>
                 {generationMode === 'image'
-                  ? 'Téléchargez vos créations en haute qualité, prêtes pour vos campagnes'
-                  : 'Veo 3.1 génère des vidéos 1080p de 8 secondes avec audio'
+                  ? 'Demandez des modifications sur vos images générées'
+                  : 'Vidéos haute qualité prêtes à publier'
                 }
               </p>
             </div>
@@ -163,153 +155,111 @@ function MainContent({
         </div>
       )}
 
-      {/* Gallery Section */}
-      {(hasContent || isGenerating) && (
-        <div className="gallery-section">
-          <div className="gallery-header">
+      {/* Chat Section */}
+      {(hasMessages || isGenerating) && (
+        <div className="chat-section">
+          <div className="chat-header">
             <h2>
-              {generationMode === 'image' ? <ImageIcon size={20} /> : <Video size={20} />}
-              {generationMode === 'image' ? 'Images générées' : 'Vidéos générées'}
+              <Sparkles size={20} />
+              Conversation
             </h2>
-            {hasContent && (
+            {hasMessages && (
               <button className="clear-history-btn" onClick={onClearHistory}>
                 <Trash2 size={16} />
-                Effacer l'historique
+                Effacer
               </button>
             )}
           </div>
 
-          <div className="images-grid">
+          <div className="chat-messages">
+            {chatMessages.map((message) => (
+              <div
+                key={message.id}
+                className={`chat-message ${message.role === 'user' ? 'user-message' : 'assistant-message'}`}
+              >
+                <div className="message-avatar">
+                  {message.role === 'user' ? (
+                    <User size={20} />
+                  ) : (
+                    <Bot size={20} />
+                  )}
+                </div>
+                <div className="message-content">
+                  {message.role === 'user' ? (
+                    <p className="message-text">{message.content}</p>
+                  ) : message.type === 'image' ? (
+                    <div className="message-media">
+                      <img
+                        src={message.content}
+                        alt="Image générée"
+                        onClick={() => setSelectedImage({ data: message.content })}
+                      />
+                      <div className="media-actions">
+                        <button
+                          className="media-action-btn"
+                          onClick={() => handleDownloadImage(message.content)}
+                          title="Télécharger"
+                        >
+                          <Download size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : message.type === 'video' ? (
+                    <div className="message-media video-media">
+                      <video
+                        src={message.content}
+                        onClick={() => setSelectedVideo({ data: message.content })}
+                      />
+                      <div className="video-play-overlay" onClick={() => setSelectedVideo({ data: message.content })}>
+                        <Play size={32} />
+                      </div>
+                      <div className="media-actions">
+                        <button
+                          className="media-action-btn"
+                          onClick={() => handleDownloadVideo(message.content)}
+                          title="Télécharger"
+                        >
+                          <Download size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="message-text">{message.content}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+
             {/* Generating State */}
             {isGenerating && (
-              <div className="generating-card animate-fade-in">
-                <div className="generating-content">
-                  {isAnalyzing ? (
-                    <>
-                      <Brain className="generating-spinner" size={40} />
-                      <p>Analyse du guide de marque...</p>
-                      <span className="generating-hint">L'agent IA extrait votre identité visuelle</span>
-                    </>
-                  ) : (
-                    <>
-                      <Loader2 className="generating-spinner" size={40} />
-                      <p>Génération {generationMode === 'image' ? 'de l\'image' : 'de la vidéo'}...</p>
-                      <span className="generating-hint">
-                        {generationMode === 'image'
-                          ? 'Cela peut prendre quelques secondes'
-                          : 'Cela peut prendre jusqu\'à 2 minutes'
-                        }
-                      </span>
-                    </>
-                  )}
+              <div className="chat-message assistant-message">
+                <div className="message-avatar">
+                  <Bot size={20} />
+                </div>
+                <div className="message-content">
+                  <div className="generating-indicator">
+                    {isAnalyzing ? (
+                      <>
+                        <Brain className="generating-spinner" size={20} />
+                        <span>Analyse en cours...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Loader2 className="generating-spinner" size={20} />
+                        <span>
+                          {generationMode === 'image'
+                            ? 'Génération de l\'image...'
+                            : 'Génération de la vidéo (environ 2 min)...'
+                          }
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Generated Images */}
-            {generatedImages.map((image) => (
-              <div
-                key={image.id}
-                className="image-card animate-slide-up"
-                onClick={() => setSelectedImage(image)}
-              >
-                <div className="image-wrapper">
-                  <img src={image.data} alt={image.prompt} />
-                  <div className="image-overlay">
-                    <button
-                      className="overlay-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDownloadImage(image)
-                      }}
-                      title="Télécharger"
-                    >
-                      <Download size={20} />
-                    </button>
-                    <button
-                      className="overlay-btn delete"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onRemoveImage(image.id)
-                      }}
-                      title="Supprimer"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                </div>
-                <div className="image-meta">
-                  <p className="image-prompt" title={image.prompt}>
-                    {image.prompt.length > 60
-                      ? image.prompt.substring(0, 57) + '...'
-                      : image.prompt}
-                  </p>
-                  <span className="image-time">
-                    <Clock size={12} />
-                    {new Date(image.timestamp).toLocaleTimeString('fr-FR', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                </div>
-              </div>
-            ))}
-
-            {/* Generated Videos */}
-            {generatedVideos.map((video) => (
-              <div
-                key={video.id}
-                className="image-card video-card animate-slide-up"
-                onClick={() => setSelectedVideo(video)}
-              >
-                <div className="image-wrapper video-wrapper">
-                  <video src={video.data} muted />
-                  <div className="video-play-icon">
-                    <Play size={32} />
-                  </div>
-                  <div className="image-overlay">
-                    <button
-                      className="overlay-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDownloadVideo(video)
-                      }}
-                      title="Télécharger"
-                    >
-                      <Download size={20} />
-                    </button>
-                    <button
-                      className="overlay-btn delete"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onRemoveVideo(video.id)
-                      }}
-                      title="Supprimer"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                </div>
-                <div className="image-meta">
-                  <div className="video-badge">
-                    <Video size={12} />
-                    <span>Vidéo</span>
-                  </div>
-                  <p className="image-prompt" title={video.prompt}>
-                    {video.prompt.length > 60
-                      ? video.prompt.substring(0, 57) + '...'
-                      : video.prompt}
-                  </p>
-                  <span className="image-time">
-                    <Clock size={12} />
-                    {new Date(video.timestamp).toLocaleTimeString('fr-FR', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                </div>
-              </div>
-            ))}
+            <div ref={chatEndRef} />
           </div>
         </div>
       )}
@@ -331,13 +281,7 @@ function MainContent({
           {brandGuideCount > 0 && (
             <div className="brand-guide-indicator">
               <Palette size={14} />
-              <span>{brandGuideCount} fichier{brandGuideCount > 1 ? 's' : ''} de guide de marque</span>
-              {generationMode === 'video' && (
-                <span className="agent-indicator">
-                  <Brain size={12} />
-                  Agent IA actif
-                </span>
-              )}
+              <span>{brandGuideCount} fichier{brandGuideCount > 1 ? 's' : ''} de référence</span>
             </div>
           )}
           <div className="prompt-input-wrapper">
@@ -345,7 +289,7 @@ function MainContent({
               ref={textareaRef}
               className="prompt-input"
               placeholder={generationMode === 'image'
-                ? "Décrivez l'image que vous souhaitez générer..."
+                ? "Décrivez l'image souhaitée ou demandez une modification..."
                 : "Décrivez la vidéo que vous souhaitez générer..."
               }
               value={prompt}
@@ -381,13 +325,12 @@ function MainContent({
             >
               <X size={24} />
             </button>
-            <img src={selectedImage.data} alt={selectedImage.prompt} />
+            <img src={selectedImage.data} alt="Image générée" />
             <div className="modal-info">
-              <p className="modal-prompt">{selectedImage.prompt}</p>
               <div className="modal-actions">
                 <button
                   className="modal-btn"
-                  onClick={() => handleDownloadImage(selectedImage)}
+                  onClick={() => handleDownloadImage(selectedImage.data)}
                 >
                   <Download size={18} />
                   Télécharger
@@ -415,11 +358,10 @@ function MainContent({
               loop
             />
             <div className="modal-info">
-              <p className="modal-prompt">{selectedVideo.prompt}</p>
               <div className="modal-actions">
                 <button
                   className="modal-btn"
-                  onClick={() => handleDownloadVideo(selectedVideo)}
+                  onClick={() => handleDownloadVideo(selectedVideo.data)}
                 >
                   <Download size={18} />
                   Télécharger

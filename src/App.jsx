@@ -21,6 +21,7 @@ function App() {
   const [hasUploadedImage, setHasUploadedImage] = useState(0) // 0 = pas d'image, 1 = image uploadée
   const [videoDuration, setVideoDuration] = useState('8s') // Durée de la vidéo: '4s', '6s', ou '8s'
   const [lastGeneratedImage, setLastGeneratedImage] = useState(null) // Mémoire de la dernière image générée pour modifications
+  const [chatMessages, setChatMessages] = useState([]) // Messages de chat (user + assistant)
 
   // Fonction pour ajouter un log
   const addLog = useCallback((message, data = null) => {
@@ -228,6 +229,18 @@ Sois CONCIS et DESCRIPTIF pour permettre la génération de vidéos cohérentes.
       return
     }
 
+    // Ajouter le message utilisateur au chat
+    const userMessage = {
+      id: Date.now(),
+      role: 'user',
+      content: prompt,
+      timestamp: new Date().toISOString()
+    }
+    setChatMessages(prev => [...prev, userMessage])
+
+    const currentPrompt = prompt
+    setPrompt('') // Vider le champ de saisie
+
     setIsGenerating(true)
     setError(null)
 
@@ -249,7 +262,7 @@ Sois CONCIS et DESCRIPTIF pour permettre la génération de vidéos cohérentes.
         }
       }
 
-      let fullPrompt = prompt
+      let fullPrompt = currentPrompt
       if (brandGuideFiles.length > 0 || lastGeneratedImage) {
         const hasLastImage = lastGeneratedImage ? '\n\nIMAGE PRÉCÉDENTE: Une image générée précédemment est fournie. Si l\'utilisateur demande une modification, applique les changements sur cette image.' : ''
         fullPrompt = `INSTRUCTIONS: Tu es un expert en création de contenus marketing.${brandGuideFiles.length > 0 ? ` Analyse attentivement le guide de marque fourni dans les ${brandGuideFiles.length} fichier(s) de référence ci-joints.` : ''}${hasLastImage}
@@ -261,7 +274,7 @@ ${brandGuideFiles.length > 0 ? `GUIDE DE MARQUE À RESPECTER STRICTEMENT:
 - Maintiens la cohérence avec l'identité de marque
 
 ` : ''}DEMANDE DU CLIENT:
-${prompt}
+${currentPrompt}
 
 ${brandGuideFiles.length > 0 ? `IMPORTANT: L'image générée DOIT être 100% conforme au guide de marque fourni, comme si elle était créée par l'équipe design de la marque.` : ''}`
       }
@@ -297,7 +310,7 @@ ${brandGuideFiles.length > 0 ? `IMPORTANT: L'image générée DOIT être 100% co
             newImages.push({
               id: Date.now() + Math.random(),
               data: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
-              prompt: prompt,
+              prompt: currentPrompt,
               timestamp: new Date().toISOString(),
               type: 'image'
             })
@@ -312,6 +325,16 @@ ${brandGuideFiles.length > 0 ? `IMPORTANT: L'image générée DOIT être 100% co
       // Sauvegarder la dernière image générée pour la mémoire de conversation
       setLastGeneratedImage(newImages[0])
       setGeneratedImages(prev => [...newImages, ...prev])
+
+      // Ajouter la réponse assistant au chat
+      const assistantMessage = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: newImages[0].data,
+        type: 'image',
+        timestamp: new Date().toISOString()
+      }
+      setChatMessages(prev => [...prev, assistantMessage])
     } catch (err) {
       console.error('Generation error:', err)
       setError(err.message || 'Une erreur est survenue lors de la génération.')
@@ -393,6 +416,18 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       return
     }
 
+    // Ajouter le message utilisateur au chat
+    const userMessage = {
+      id: Date.now(),
+      role: 'user',
+      content: prompt,
+      timestamp: new Date().toISOString()
+    }
+    setChatMessages(prev => [...prev, userMessage])
+
+    const currentPrompt = prompt
+    setPrompt('') // Vider le champ de saisie
+
     setIsGenerating(true)
     setIsAnalyzing(true)
     setError(null)
@@ -455,14 +490,14 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
 
       // Étape 2: Préparer le body de la requête avec le PROMPT ORIGINAL (non modifié)
       const inputParams = {
-        prompt: prompt, // Prompt original sans modification
+        prompt: currentPrompt, // Prompt original sans modification
         duration: videoDuration,
         aspect_ratio: '16:9',
         resolution: '720p',
         generate_audio: true
       }
 
-      addLog('📝 Prompt envoyé (non modifié)', { prompt: prompt })
+      addLog('📝 Prompt envoyé (non modifié)', { prompt: currentPrompt })
 
       // Si image-to-video, convertir l'image en base64 data URL et l'ajouter à la requête
       if (useImageToVideo) {
@@ -586,12 +621,22 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
         const newVideo = {
           id: Date.now() + Math.random(),
           data: videoUrl,
-          prompt: prompt,
+          prompt: currentPrompt,
           timestamp: new Date().toISOString(),
           type: 'video'
         }
         setGeneratedVideos(prev => [newVideo, ...prev])
         addLog('🎬 Vidéo ajoutée à la galerie', { url: videoUrl })
+
+        // Ajouter la réponse assistant au chat
+        const assistantMessage = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: videoUrl,
+          type: 'video',
+          timestamp: new Date().toISOString()
+        }
+        setChatMessages(prev => [...prev, assistantMessage])
       } else {
         addLog('⚠️ URL vidéo vide dans la réponse webhook')
         throw new Error('URL de la vidéo non trouvée dans la réponse du webhook')
@@ -626,6 +671,7 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
     setGeneratedImages([])
     setGeneratedVideos([])
     setLastGeneratedImage(null) // Réinitialiser la mémoire de conversation
+    setChatMessages([]) // Réinitialiser l'historique du chat
   }, [])
 
   const handleRemoveImage = useCallback((imageId) => {
@@ -658,13 +704,10 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
           onGenerate={handleGenerate}
           isGenerating={isGenerating}
           isAnalyzing={isAnalyzing}
-          generatedImages={generatedImages}
-          generatedVideos={generatedVideos}
+          chatMessages={chatMessages}
           error={error}
           onClearError={() => setError(null)}
           onClearHistory={handleClearHistory}
-          onRemoveImage={handleRemoveImage}
-          onRemoveVideo={handleRemoveVideo}
           brandGuideCount={brandGuideFiles.length}
           generationMode={generationMode}
         />
