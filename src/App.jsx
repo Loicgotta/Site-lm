@@ -170,6 +170,38 @@ function App() {
     })
   }
 
+  // Obtenir les dimensions d'une image à partir d'un fichier
+  const getImageDimensions = (file) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        URL.revokeObjectURL(img.src)
+        resolve({ width: img.width, height: img.height })
+      }
+      img.onerror = reject
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
+  // Déterminer le meilleur aspect ratio pour Fal.ai basé sur les dimensions de l'image
+  const getBestAspectRatio = (width, height) => {
+    const ratio = width / height
+
+    // Options disponibles pour Fal.ai Veo
+    // On choisit le ratio qui minimise le recadrage
+    if (ratio >= 1.6) {
+      return '16:9' // Paysage large
+    } else if (ratio >= 1.2) {
+      return '4:3' // Paysage standard
+    } else if (ratio >= 0.9) {
+      return '1:1' // Carré
+    } else if (ratio >= 0.7) {
+      return '3:4' // Portrait standard
+    } else {
+      return '9:16' // Portrait vertical
+    }
+  }
+
   // Agent IA pour analyser le guide de marque avec Gemini
   const analyzeBrandGuide = useCallback(async () => {
     if (brandGuideFiles.length === 0) return null
@@ -489,15 +521,33 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
       addLog('🎯 Endpoint sélectionné', { endpoint })
 
       // Étape 2: Préparer le body de la requête avec le PROMPT ORIGINAL (non modifié)
+      let aspectRatio = '16:9' // Par défaut
+
+      // Si image-to-video, détecter l'aspect ratio de l'image pour éviter le recadrage
+      if (useImageToVideo && imageFile) {
+        try {
+          const dimensions = await getImageDimensions(imageFile)
+          aspectRatio = getBestAspectRatio(dimensions.width, dimensions.height)
+          addLog('📐 Dimensions image détectées', {
+            width: dimensions.width,
+            height: dimensions.height,
+            ratio: (dimensions.width / dimensions.height).toFixed(2),
+            aspectRatioChoisi: aspectRatio
+          })
+        } catch (err) {
+          addLog('⚠️ Impossible de détecter les dimensions, utilisation de 16:9 par défaut')
+        }
+      }
+
       const inputParams = {
         prompt: currentPrompt, // Prompt original sans modification
         duration: videoDuration,
-        aspect_ratio: '16:9',
+        aspect_ratio: aspectRatio,
         resolution: '720p',
         generate_audio: true
       }
 
-      addLog('📝 Prompt envoyé (non modifié)', { prompt: currentPrompt })
+      addLog('📝 Prompt envoyé (non modifié)', { prompt: currentPrompt, aspectRatio })
 
       // Si image-to-video, convertir l'image en base64 data URL et l'ajouter à la requête
       if (useImageToVideo) {
@@ -524,7 +574,8 @@ Réponds UNIQUEMENT avec le JSON, sans autre texte.`
 
           addLog('✅ Image convertie et ajoutée au body', {
             dataUrlLength: imageDataUrl.length,
-            dataUrlPrefix: imageDataUrl.substring(0, 50) + '...'
+            dataUrlPrefix: imageDataUrl.substring(0, 50) + '...',
+            aspectRatio: aspectRatio
           })
         } else {
           addLog('⚠️ ERREUR: Image attendue mais non trouvée!', {
